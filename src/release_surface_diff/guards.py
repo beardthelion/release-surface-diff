@@ -328,7 +328,7 @@ def classify_diff(
             class_lines = [
                 (s, c) for s, c, cs in matched if winning in cs
             ]
-            signs = {s for s, _ in class_lines}
+            signs = {s for s, _, _ in matched}
             if signs == {"+"}:
                 direction = "added"
             elif signs == {"-"}:

@@ -19,14 +19,6 @@ ENTRY_KINDS = ("route", "rpc", "protocol_id")
 def _entry_records(surface: dict) -> dict[str, list]:
     """Delta lists restricted to entry-point kinds (route/rpc/protocol_id)."""
     ranked = rank_delta(surface)
-
-    def kind_of(item: dict) -> str:
-        # changed/renamed entries are {before, after} pairs; the after side
-        # carries the kind when both differ.
-        if "after" in item or "before" in item:
-            return _rec_kind(item.get("after") or item.get("before") or {})
-        return _rec_kind(item)
-
     return {
         bucket: [r for r in ranked[bucket] if kind_of(r) in ENTRY_KINDS]
         for bucket in ("added", "removed", "changed", "renamed")
@@ -35,6 +27,14 @@ def _entry_records(surface: dict) -> dict[str, list]:
 
 def _rec_kind(rec: dict) -> str:
     return (rec or {}).get("kind", "")
+
+
+def kind_of(item: dict) -> str:
+    # changed/renamed entries are {before, after} pairs; the after side
+    # carries the kind when both differ.
+    if "after" in item or "before" in item:
+        return _rec_kind(item.get("after") or item.get("before") or {})
+    return _rec_kind(item)
 
 
 def shape_tags(record: dict, hunks: list[RankedHunk]) -> list[str]:
@@ -126,6 +126,28 @@ def build_report(
                     f" weight {weight}){low}"
                 )
         lines.append("")
+
+    others = {
+        bucket: [r for r in rank_delta(surface)[bucket] if kind_of(r) not in ENTRY_KINDS]
+        for bucket in ("added", "removed", "changed", "renamed")
+    }
+    if any(others.values()):
+        lines.append("## Other surface delta (flags, config keys, exports, outbound)")
+        lines.append("")
+        for bucket, label in (
+            ("added", "Added"), ("changed", "Changed"),
+            ("renamed", "Renamed"), ("removed", "Removed"),
+        ):
+            for item in others[bucket]:
+                if "after" in item or "before" in item:
+                    before, after = item.get("before") or {}, item.get("after") or {}
+                    lines.append(
+                        f"- {label} {_rec_kind(after) or _rec_kind(before)}"
+                        f" `{before.get('id','?')}` -> `{after.get('id','?')}`"
+                    )
+                else:
+                    lines.append(f"- {label} {_rec_kind(item)} `{item.get('id','?')}`")
+            lines.append("")
 
     lines.append("## Guard hunks (ranked)")
     lines.append("")

@@ -164,11 +164,12 @@ index 111..222 100644
 
 
 def test_precedence_first_class_wins() -> None:
-    # both auth (removed) and bounds (added) lines; bounds outranks auth and
-    # direction is computed on the winning class's lines only
+    # both auth (removed) and bounds (added) lines; bounds outranks auth for
+    # the class label, but direction counts every matched line so a removed
+    # guard of any class cannot be masked as a pure addition
     [h] = guards.classify_diff(MINI)
     assert h.hunk_class == "bounds"
-    assert h.direction == "added"
+    assert h.direction == "modified"
     assert h.evidence == "+    if len(b) > max_len:"
 
 
