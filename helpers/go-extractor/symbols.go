@@ -173,6 +173,13 @@ func stringLit(e ast.Expr) (string, bool) {
 
 // resolveString resolves a literal or a package-level string const/var.
 func (p *pkgCtx) resolveString(e ast.Expr, locals map[string]string) (string, bool) {
+	if b, ok := e.(*ast.BinaryExpr); ok && b.Op == token.ADD {
+		l, lok := p.resolveString(b.X, locals)
+		r, rok := p.resolveString(b.Y, locals)
+		if lok && rok {
+			return l + r, true
+		}
+	}
 	if lit, ok := stringLit(e); ok {
 		return lit, true
 	}

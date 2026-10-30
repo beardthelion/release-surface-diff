@@ -2,6 +2,7 @@ package main
 
 import (
 	"go/ast"
+	"go/token"
 	"regexp"
 	"strconv"
 	"strings"
@@ -257,6 +258,13 @@ func (s *routeScope) mwNames(args []ast.Expr) []string {
 func (s *routeScope) stringOf(e ast.Expr) (string, bool) {
 	if lit, ok := stringLit(e); ok {
 		return lit, true
+	}
+	if b, ok := e.(*ast.BinaryExpr); ok && b.Op == token.ADD {
+		l, lok := s.stringOf(b.X)
+		r, rok := s.stringOf(b.Y)
+		if lok && rok {
+			return l + r, true
+		}
 	}
 	if id, ok := e.(*ast.Ident); ok {
 		if v, hit := s.consts[id.Name]; hit {
@@ -569,6 +577,9 @@ func (w *routeWalker) walkStmt(stmt ast.Stmt, scope *routeScope) {
 	case *ast.ForStmt:
 		w.walkBlock(s.Body, scope)
 	case *ast.RangeStmt:
+		if w.walkLiteralRange(s, scope) {
+			break
+		}
 		w.walkBlock(s.Body, scope)
 	case *ast.SwitchStmt:
 		w.walkBlock(s.Body, scope)
@@ -588,6 +599,45 @@ func (w *routeWalker) walkStmt(stmt ast.Stmt, scope *routeScope) {
 		// ExprStmt, ReturnStmt, SendStmt, IncDecStmt, LabeledStmt, etc.
 		w.scanExpr(stmt, scope)
 	}
+}
+
+// walkLiteralRange unrolls `for _, v := range []string{lit, ...}` loops so
+// registrations that concat the loop var into a path ("/"+route) resolve
+// to real mounts: one walk per literal element.
+func (w *routeWalker) walkLiteralRange(s *ast.RangeStmt, scope *routeScope) bool {
+	cl, ok := s.X.(*ast.CompositeLit)
+	if !ok {
+		return false
+	}
+	var names []string
+	for _, e := range []ast.Expr{s.Key, s.Value} {
+		if id, ok := e.(*ast.Ident); ok && id.Name != "_" {
+			names = append(names, id.Name)
+		} else {
+			names = append(names, "")
+		}
+	}
+	var lits []string
+	for _, e := range cl.Elts {
+		lit, ok := stringLit(e)
+		if !ok {
+			return false
+		}
+		lits = append(lits, lit)
+	}
+	if len(lits) == 0 {
+		return false
+	}
+	for _, lit := range lits {
+		child := scope.child()
+		for _, n := range names {
+			if n != "" {
+				child.consts[n] = lit
+			}
+		}
+		w.walkBlock(s.Body, child)
+	}
+	return true
 }
 
 // bindAssign records `x := <call>` bindings that matter to route scope:
