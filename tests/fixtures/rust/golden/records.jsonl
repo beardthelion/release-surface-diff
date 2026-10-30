@@ -1,0 +1,90 @@
+{"attrs":{"framework":"clap","role":"subcommand"},"extractor":"rust-extractor@0.1.0","file":"src/flags.rs","id":"--diff-report","kind":"cli_flag","lang":"rust","line":27,"symbol":"Commands::DiffReport"}
+{"attrs":{"framework":"clap","role":"flag"},"extractor":"rust-extractor@0.1.0","file":"src/flags.rs","id":"--listen-addr","kind":"cli_flag","lang":"rust","line":33,"symbol":"NetArgs::listen_addr"}
+{"attrs":{"framework":"clap","role":"flag"},"extractor":"rust-extractor@0.1.0","file":"src/flags.rs","id":"--output-dir","kind":"cli_flag","lang":"rust","line":12,"symbol":"Cli::out"}
+{"attrs":{"framework":"clap","role":"subcommand"},"extractor":"rust-extractor@0.1.0","file":"src/flags.rs","id":"--scan","kind":"cli_flag","lang":"rust","line":25,"symbol":"Commands::Scan"}
+{"attrs":{"framework":"clap","role":"flag"},"extractor":"rust-extractor@0.1.0","file":"src/flags.rs","id":"--verbose","kind":"cli_flag","lang":"rust","line":9,"symbol":"Cli::verbose"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"boot-nodes","kind":"config_key","lang":"rust","line":25,"symbol":"P2pConfig::boot_nodes"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"datadir","kind":"config_key","lang":"rust","line":8,"symbol":"NodeConfig::datadir"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"http-port","kind":"config_key","lang":"rust","line":10,"symbol":"NodeConfig::http_port"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"labels","kind":"config_key","lang":"rust","line":16,"symbol":"NodeConfig::labels"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"log-level","kind":"config_key","lang":"rust","line":31,"symbol":"CommonConfig::log_level"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"max-peers","kind":"config_key","lang":"rust","line":23,"symbol":"P2pConfig::max_peers"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"metrics","kind":"config_key","lang":"rust","line":13,"symbol":"NodeConfig::metrics"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"p2p","kind":"config_key","lang":"rust","line":12,"symbol":"NodeConfig::network"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"p2p.boot-nodes","kind":"config_key","lang":"rust","line":25,"symbol":"P2pConfig::boot_nodes"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"p2p.max-peers","kind":"config_key","lang":"rust","line":23,"symbol":"P2pConfig::max_peers"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"p2p.port","kind":"config_key","lang":"rust","line":21,"symbol":"P2pConfig::port"}
+{"attrs":{"serde":true},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"port","kind":"config_key","lang":"rust","line":21,"symbol":"P2pConfig::port"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/flags.rs","id":"Cli","kind":"export","lang":"rust","line":5,"symbol":"Cli"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/flags.rs","id":"Commands","kind":"export","lang":"rust","line":23,"symbol":"Commands"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"CommonConfig","kind":"export","lang":"rust","line":28,"symbol":"CommonConfig"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/api.rs","id":"Engine","kind":"export","lang":"rust","line":36,"symbol":"Engine"}
+{"attrs":{"role":"method"},"extractor":"rust-extractor@0.1.0","file":"src/api.rs","id":"Engine::start","kind":"export","lang":"rust","line":38,"symbol":"Engine::start"}
+{"attrs":{"role":"trait"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"EthApi","kind":"export","lang":"rust","line":12,"symbol":"EthApi"}
+{"attrs":{"role":"trait_method"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"EthApi::block_number","kind":"export","lang":"rust","line":22,"symbol":"EthApi::block_number"}
+{"attrs":{"role":"trait_method"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"EthApi::call","kind":"export","lang":"rust","line":17,"symbol":"EthApi::call"}
+{"attrs":{"role":"trait_method"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"EthApi::get_proof","kind":"export","lang":"rust","line":14,"symbol":"EthApi::get_proof"}
+{"attrs":{"role":"trait_method"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"EthApi::subscribe","kind":"export","lang":"rust","line":20,"symbol":"EthApi::subscribe"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"EthApiServer","kind":"export","lang":"rust","line":35,"symbol":"EthApiServer"}
+{"attrs":{"role":"method"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"EthApiServer::new","kind":"export","lang":"rust","line":37,"symbol":"EthApiServer::new"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"Greeter","kind":"export","lang":"rust","line":9,"symbol":"Greeter"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"MetricsToml","kind":"export","lang":"rust","line":35,"symbol":"MetricsToml"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/api.rs","id":"Mode","kind":"export","lang":"rust","line":31,"symbol":"Mode"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/flags.rs","id":"NetArgs","kind":"export","lang":"rust","line":30,"symbol":"NetArgs"}
+{"attrs":{"role":"use"},"extractor":"rust-extractor@0.1.0","file":"src/lib.rs","id":"Node","kind":"export","lang":"rust","line":12,"symbol":"Node"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"NodeConfig","kind":"export","lang":"rust","line":6,"symbol":"NodeConfig"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/cfg.rs","id":"P2pConfig","kind":"export","lang":"rust","line":19,"symbol":"P2pConfig"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"Proof","kind":"export","lang":"rust","line":8,"symbol":"Proof"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/api.rs","id":"PublicConfig","kind":"export","lang":"rust","line":27,"symbol":"PublicConfig"}
+{"attrs":{"role":"trait"},"extractor":"rust-extractor@0.1.0","file":"src/api.rs","id":"Runner","kind":"export","lang":"rust","line":42,"symbol":"Runner"}
+{"attrs":{"role":"trait_method"},"extractor":"rust-extractor@0.1.0","file":"src/api.rs","id":"Runner::run","kind":"export","lang":"rust","line":43,"symbol":"Runner::run"}
+{"attrs":{"role":"mod"},"extractor":"rust-extractor@0.1.0","file":"src/lib.rs","id":"api","kind":"export","lang":"rust","line":3,"symbol":"api"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/routes_actix.rs","id":"app","kind":"export","lang":"rust","line":30,"symbol":"app"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/routes_axum.rs","id":"app","kind":"export","lang":"rust","line":9,"symbol":"app"}
+{"attrs":{"role":"mod"},"extractor":"rust-extractor@0.1.0","file":"src/lib.rs","id":"cfg","kind":"export","lang":"rust","line":4,"symbol":"cfg"}
+{"attrs":{"role":"mod"},"extractor":"rust-extractor@0.1.0","file":"src/lib.rs","id":"flags","kind":"export","lang":"rust","line":5,"symbol":"flags"}
+{"attrs":{"role":"mod"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"greeter","kind":"export","lang":"rust","line":25,"symbol":"greeter"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"greeter::GreeterServer","kind":"export","lang":"rust","line":27,"symbol":"greeter::GreeterServer"}
+{"attrs":{"role":"method"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"greeter::GreeterServer::new","kind":"export","lang":"rust","line":29,"symbol":"greeter::GreeterServer::new"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"greeter::GreeterService","kind":"export","lang":"rust","line":26,"symbol":"greeter::GreeterService"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/api.rs","id":"main_entry","kind":"export","lang":"rust","line":17,"symbol":"main_entry"}
+{"attrs":{"role":"mod"},"extractor":"rust-extractor@0.1.0","file":"src/lib.rs","id":"proto","kind":"export","lang":"rust","line":6,"symbol":"proto"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/proto.rs","id":"protocols","kind":"export","lang":"rust","line":9,"symbol":"protocols"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/routes_warp.rs","id":"routes","kind":"export","lang":"rust","line":15,"symbol":"routes"}
+{"attrs":{"role":"mod"},"extractor":"rust-extractor@0.1.0","file":"src/lib.rs","id":"routes_actix","kind":"export","lang":"rust","line":8,"symbol":"routes_actix"}
+{"attrs":{"role":"mod"},"extractor":"rust-extractor@0.1.0","file":"src/lib.rs","id":"routes_axum","kind":"export","lang":"rust","line":9,"symbol":"routes_axum"}
+{"attrs":{"role":"mod"},"extractor":"rust-extractor@0.1.0","file":"src/lib.rs","id":"routes_warp","kind":"export","lang":"rust","line":10,"symbol":"routes_warp"}
+{"attrs":{"role":"mod"},"extractor":"rust-extractor@0.1.0","file":"src/lib.rs","id":"rpc","kind":"export","lang":"rust","line":7,"symbol":"rpc"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/lib.rs","id":"run","kind":"export","lang":"rust","line":14,"symbol":"run"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"serve","kind":"export","lang":"rust","line":42,"symbol":"serve"}
+{"attrs":{"role":"mod"},"extractor":"rust-extractor@0.1.0","file":"src/api.rs","id":"server","kind":"export","lang":"rust","line":4,"symbol":"server"}
+{"attrs":{"role":"item"},"extractor":"rust-extractor@0.1.0","file":"src/api.rs","id":"server::serve","kind":"export","lang":"rust","line":5,"symbol":"server::serve"}
+{"attrs":{"framework":"libp2p","resolved_literal":true,"structured":true},"extractor":"rust-extractor@0.1.0","file":"src/proto.rs","id":"/eth2/beacon_chain/req/blocks/1/ssz_snappy","kind":"protocol_id","lang":"rust","line":15,"symbol":"protocols"}
+{"attrs":{"framework":"libp2p","resolved_literal":false,"structured":true},"extractor":"rust-extractor@0.1.0","file":"src/proto.rs","id":"BEACON_STATUS","kind":"protocol_id","lang":"rust","line":13,"symbol":"protocols"}
+{"attrs":{"framework":"libp2p","resolved_literal":false,"structured":true},"extractor":"rust-extractor@0.1.0","file":"src/proto.rs","id":"Self::PROTO","kind":"protocol_id","lang":"rust","line":16,"symbol":"protocols"}
+{"attrs":{"auth_hint":["trace_requests"],"framework":"axum","handler":"file_service"},"extractor":"rust-extractor@0.1.0","file":"src/routes_axum.rs","id":"ANY /static","kind":"route","lang":"rust","line":18,"symbol":"file_service"}
+{"attrs":{"auth_hint":["trace_requests"],"framework":"axum","handler":"remove_item"},"extractor":"rust-extractor@0.1.0","file":"src/routes_axum.rs","id":"DELETE /items/{item_id}","kind":"route","lang":"rust","line":16,"symbol":"remove_item"}
+{"attrs":{"auth_hint":["require_auth","trace_requests"],"framework":"axum","handler":"admin_panel"},"extractor":"rust-extractor@0.1.0","file":"src/routes_axum.rs","id":"GET /admin","kind":"route","lang":"rust","line":19,"symbol":"admin_panel"}
+{"attrs":{"auth_hint":["trace_requests"],"framework":"axum","handler":"user_by_id"},"extractor":"rust-extractor@0.1.0","file":"src/routes_axum.rs","id":"GET /api/users/{id}","kind":"route","lang":"rust","line":11,"symbol":"user_by_id"}
+{"attrs":{"framework":"warp","handler":"list_things"},"extractor":"rust-extractor@0.1.0","file":"src/routes_warp.rs","id":"GET /api/v1/things/{param}","kind":"route","lang":"rust","line":27,"symbol":"list_things"}
+{"attrs":{"auth_hint":["trace_requests"],"framework":"axum","handler":"health"},"extractor":"rust-extractor@0.1.0","file":"src/routes_axum.rs","id":"GET /health","kind":"route","lang":"rust","line":15,"symbol":"health"}
+{"attrs":{"framework":"actix","handler":"list_items"},"extractor":"rust-extractor@0.1.0","file":"src/routes_actix.rs","id":"GET /items","kind":"route","lang":"rust","line":35,"symbol":"list_items"}
+{"attrs":{"framework":"actix","handler":"multi"},"extractor":"rust-extractor@0.1.0","file":"src/routes_actix.rs","id":"GET /multi","kind":"route","lang":"rust","line":15,"symbol":"multi"}
+{"attrs":{"auth_hint":["trace_requests"],"framework":"axum","handler":"order_tail"},"extractor":"rust-extractor@0.1.0","file":"src/routes_axum.rs","id":"GET /orders/{rest}","kind":"route","lang":"rust","line":17,"symbol":"order_tail"}
+{"attrs":{"auth_hint":["trace_requests"],"framework":"axum","handler":"status"},"extractor":"rust-extractor@0.1.0","file":"src/routes_axum.rs","id":"GET /status","kind":"route","lang":"rust","line":13,"symbol":"status"}
+{"attrs":{"framework":"actix","handler":"user_by_id"},"extractor":"rust-extractor@0.1.0","file":"src/routes_actix.rs","id":"GET /users/{id}","kind":"route","lang":"rust","line":5,"symbol":"user_by_id"}
+{"attrs":{"framework":"warp","handler":"get_user"},"extractor":"rust-extractor@0.1.0","file":"src/routes_warp.rs","id":"GET /users/{param}","kind":"route","lang":"rust","line":19,"symbol":"get_user"}
+{"attrs":{"framework":"actix","handler":"multi"},"extractor":"rust-extractor@0.1.0","file":"src/routes_actix.rs","id":"HEAD /multi","kind":"route","lang":"rust","line":15,"symbol":"multi"}
+{"attrs":{"auth_hint":["trace_requests"],"framework":"axum","handler":"create_user"},"extractor":"rust-extractor@0.1.0","file":"src/routes_axum.rs","id":"POST /api/users","kind":"route","lang":"rust","line":12,"symbol":"create_user"}
+{"attrs":{"framework":"actix","handler":"create_item"},"extractor":"rust-extractor@0.1.0","file":"src/routes_actix.rs","id":"POST /items","kind":"route","lang":"rust","line":36,"symbol":"create_item"}
+{"attrs":{"framework":"actix","handler":"create_user"},"extractor":"rust-extractor@0.1.0","file":"src/routes_actix.rs","id":"POST /users","kind":"route","lang":"rust","line":10,"symbol":"create_user"}
+{"attrs":{"framework":"warp","handler":"create_user"},"extractor":"rust-extractor@0.1.0","file":"src/routes_warp.rs","id":"POST /users","kind":"route","lang":"rust","line":23,"symbol":"create_user"}
+{"attrs":{"framework":"actix","handler":"put_thing"},"extractor":"rust-extractor@0.1.0","file":"src/routes_actix.rs","id":"PUT /api/v1/things","kind":"route","lang":"rust","line":40,"symbol":"put_thing"}
+{"attrs":{"framework":"tonic","service":"EthApiServer::new(api)"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"EthApi","kind":"rpc","lang":"rust","line":45,"symbol":"serve"}
+{"attrs":{"framework":"tonic","service":"greeter::GreeterServer::new(greeter::GreeterService)"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"Greeter","kind":"rpc","lang":"rust","line":44,"symbol":"serve"}
+{"attrs":{"framework":"jsonrpsee"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"debug_traceCall","kind":"rpc","lang":"rust","line":50,"symbol":"manual"}
+{"attrs":{"framework":"jsonrpsee"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"eth_block_number","kind":"rpc","lang":"rust","line":22,"symbol":"EthApi::block_number"}
+{"attrs":{"framework":"jsonrpsee"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"eth_call","kind":"rpc","lang":"rust","line":17,"symbol":"EthApi::call"}
+{"attrs":{"framework":"jsonrpsee"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"eth_getProof","kind":"rpc","lang":"rust","line":14,"symbol":"EthApi::get_proof"}
+{"attrs":{"framework":"jsonrpsee"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"eth_subscribe","kind":"rpc","lang":"rust","line":20,"symbol":"EthApi::subscribe"}
+{"attrs":{"framework":"jsonrpsee"},"extractor":"rust-extractor@0.1.0","file":"src/rpc.rs","id":"eth_syncing","kind":"rpc","lang":"rust","line":53,"symbol":"manual"}

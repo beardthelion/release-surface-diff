@@ -1,0 +1,5 @@
+{"callee":"file_service","caller":"app"}
+{"callee":"helper_call","caller":"main_entry"}
+{"callee":"server::serve","caller":"main_entry"}
+{"callee":"EthApiServer::new","caller":"serve"}
+{"callee":"greeter::GreeterServer::new","caller":"serve"}

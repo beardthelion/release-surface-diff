@@ -1,0 +1,11 @@
+[package]
+name = "rust-extractor"
+version = "0.1.0"
+edition = "2021"
+description = "Rust release-surface extractor for release-surface-diff (R9, R11)"
+
+[dependencies]
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+serde_json = "1"
+syn = { version = "2", features = ["full", "parsing", "visit"] }

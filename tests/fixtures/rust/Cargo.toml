@@ -1,0 +1,5 @@
+# Inert manifest so the fixture reads as a crate root. Never built.
+[package]
+name = "fixture-rust"
+version = "0.0.0"
+edition = "2021"
