@@ -119,11 +119,36 @@ def load_watch_config(path) -> tuple[list[dict], dict]:
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError(f"invalid targets file {path}: {exc}") from exc
     targets = data.get("target", [])
+    if not isinstance(targets, list):
+        raise ConfigError(
+            f"targets file {path}: 'target' must be a list of tables"
+        )
+    seen_repos = set()
     for i, target in enumerate(targets):
+        if not isinstance(target, dict):
+            raise ConfigError(
+                f"targets file {path}: target #{i + 1} is not a table"
+            )
         if "repo" not in target:
             raise ConfigError(f"targets file {path}: target #{i + 1} has no repo")
+        repo = str(target["repo"])
+        if repo in seen_repos:
+            raise ConfigError(
+                f"targets file {path}: duplicate repo {repo!r}"
+            )
+        seen_repos.add(repo)
         if "lang" in target:
             parse_langs(target["lang"])  # validate tokens now, not at run time
+        for key in ("include", "exclude"):
+            globs = target.get(key)
+            if globs is not None and (
+                not isinstance(globs, list)
+                or not all(isinstance(g, str) for g in globs)
+            ):
+                raise ConfigError(
+                    f"targets file {path}: target #{i + 1} '{key}' "
+                    "must be a list of strings"
+                )
     options = {k: v for k, v in data.items() if k != "target"}
     return targets, options
 

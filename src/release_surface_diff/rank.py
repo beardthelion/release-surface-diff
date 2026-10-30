@@ -65,20 +65,22 @@ def iter_delta_records(surface: dict):
         yield pair.get("after") or {}
 
 
-def _symbol_weights(surface: dict) -> dict[str, int]:
-    """symbol -> max surface weight over every delta record.
+def _symbol_weights(surface: dict) -> dict[tuple[str, str], int]:
+    """(file, symbol) -> max surface weight over every delta record.
 
     Both sides count: a removed function is a surface delta too, and its
-    hunks rank by the same rule.
+    hunks rank by the same rule. Keying on the file keeps same-named
+    functions in different files from leaking weight across the surface.
     """
-    weights: dict[str, int] = {}
+    weights: dict[tuple[str, str], int] = {}
     for rec in iter_delta_records(surface):
         sym = rec.get("symbol") or ""
         if not sym:
             continue
+        key = (rec.get("file") or "", sym)
         w = surface_weight(rec.get("kind", ""))
-        if w > weights.get(sym, 0):
-            weights[sym] = w
+        if w > weights.get(key, 0):
+            weights[key] = w
     return weights
 
 
@@ -171,7 +173,7 @@ def rank_hunks(hunks, surface: dict, edges=()) -> list[RankedHunk]:
         ranked.append(
             RankedHunk(
                 hunk=h,
-                surface_weight=sym_weights.get(sym, 0),
+                surface_weight=sym_weights.get((h.file, sym), 0),
                 guard_weight=h.weight,
                 reach_bonus=REACH_BONUS if sym and sym in reach else 0,
             )

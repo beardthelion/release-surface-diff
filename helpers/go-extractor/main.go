@@ -527,6 +527,18 @@ func run(args []string) int {
 	sortSpans(spans)
 	edges = sortEdges(edges)
 
+	// Records go to stdout before the sidecars: a sidecar write
+	// failure must not cost the run its primary output (the rust
+	// extractor orders the same way).
+	enc := json.NewEncoder(os.Stdout)
+	for _, r := range records {
+		if err := enc.Encode(r); err != nil {
+			warn("stdout encode failed: %v", err)
+			return 2
+		}
+	}
+
+	rc := 0
 	if symbolsPath != "" {
 		if err := writeJSONL(symbolsPath, func(emit func(v any)) {
 			for _, s := range spans {
@@ -534,7 +546,7 @@ func run(args []string) int {
 			}
 		}); err != nil {
 			warn("cannot write symbols sidecar: %v", err)
-			return 2
+			rc = 2
 		}
 	}
 	if edgesPath != "" {
@@ -544,16 +556,11 @@ func run(args []string) int {
 			}
 		}); err != nil {
 			warn("cannot write edges sidecar: %v", err)
-			return 2
+			rc = 2
 		}
 	}
-
-	enc := json.NewEncoder(os.Stdout)
-	for _, r := range records {
-		if err := enc.Encode(r); err != nil {
-			warn("stdout encode failed: %v", err)
-			return 2
-		}
+	if len(records) > 0 {
+		return 0
 	}
-	return 0
+	return rc
 }

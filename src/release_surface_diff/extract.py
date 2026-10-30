@@ -2,8 +2,7 @@
 
 - every language's outbound surface comes from the egress-plane adapter (R5)
 - python/ts route surface comes from acl-guard-audit plus the in-repo route
-  extractor (KD1/KTD12; the module lands in U5, so its call site tolerates
-  absence)
+  extractor (KD1/KTD12)
 - go/rust records come from the helper binaries via adapters/helpers.py
 
 Discovery per external tool is explicit flag > env var > PATH, then a
@@ -18,6 +17,7 @@ from pathlib import Path
 
 from .adapters import AdapterResult, aclguard, egress, helpers
 from .config import PathMatcher
+from .extractors import protocol_ids, py_ts_routes
 
 ACLGUARD_LANGS = ("python", "ts")
 
@@ -57,44 +57,25 @@ def find_tool(binary: str, explicit=None, env_var=None):
     )
 
 
-def _optional_extractor(module_name: str, label: str, missing: str, root: Path) -> AdapterResult:
-    """Tolerate-absence wrapper for in-repo extractors: an ImportError or a
-    raised failure degrades to a gap note (R17) rather than a hard error."""
+def _run_extractor(module, label: str, root: Path,
+                   matcher: PathMatcher) -> AdapterResult:
+    """A raised extractor failure degrades to a gap note (R17) rather than
+    a hard error."""
     try:
-        module = __import__(
-            f"release_surface_diff.extractors.{module_name}", fromlist=["extract"]
-        )
-    except ImportError:
-        return AdapterResult().degrade(label, missing)
-    try:
-        out = module.extract(root)
+        return module.extract(root, matcher)
     except Exception as exc:
         return AdapterResult().degrade(label, f"extract failed: {exc}")
-    if isinstance(out, AdapterResult):
-        return out
-    result = AdapterResult()
-    if out:
-        result.records = list(out)
-    return result
 
 
-def _py_ts_routes(root: Path) -> AdapterResult:
+def _py_ts_routes(root: Path, matcher: PathMatcher) -> AdapterResult:
     """In-repo Python/TS route extractor (KD1/KTD12)."""
-    return _optional_extractor(
-        "py_ts_routes", "py-ts-routes",
-        "in-repo Python/TS route extractor not present; acl-guard-audit sees "
-        "only sink-bearing handlers and id-param candidates (KD1)",
-        root,
-    )
+    return _run_extractor(py_ts_routes, "py-ts-routes", root, matcher)
 
 
-def _protocol_ids(root: Path) -> AdapterResult:
+def _protocol_ids(root: Path, matcher: PathMatcher) -> AdapterResult:
     """Bare-literal protocol-id pass (R10): the single producer for
     req/resp protocol strings and gossip topic templates in every language."""
-    return _optional_extractor(
-        "protocol_ids", "protocol-ids",
-        "in-repo protocol-id extractor not present", root,
-    )
+    return _run_extractor(protocol_ids, "protocol-ids", root, matcher)
 
 
 def _dedupe_py_ts_routes(result: AdapterResult) -> None:
@@ -149,11 +130,11 @@ def extract_tree(root, langs, matcher=None, tools=None) -> AdapterResult:
             if exe
             else AdapterResult().degrade(aclguard.TOOL_NAME, warn)
         )
-        result.merge(_py_ts_routes(root))
+        result.merge(_py_ts_routes(root, matcher))
         _dedupe_py_ts_routes(result)
 
     if langs:
-        result.merge(_protocol_ids(root))
+        result.merge(_protocol_ids(root, matcher))
 
     for lang in langs:
         if lang in helpers.HELPERS:

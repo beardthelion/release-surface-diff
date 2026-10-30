@@ -23,7 +23,7 @@
       "new_start": 1,
       "old_end": 20,
       "old_start": 1,
-      "symbol": "tls_context",
+      "symbol": "parse_args",
       "weight": 3
     }
   ],

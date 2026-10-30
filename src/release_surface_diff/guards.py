@@ -15,10 +15,8 @@ Hunks are emitted in diff order (file order, then hunk order) so output is
 deterministic across runs (R16).
 """
 
-import json
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 from ._util import canonical_json, utc_now, write_text
@@ -296,15 +294,22 @@ def classify_diff(
     diff_text: str,
     matcher: "PathMatcher | None" = None,
     symbols=None,
+    symbols_from=None,
 ) -> list[GuardHunk]:
     """Parse diff_text and return security-relevant hunks, in diff order.
 
     Only files passing `matcher` (default: PathMatcher defaults, KTD11) are
-    scanned. `symbols` is the merged extractor symbol table (KTD7); without
-    it, the `@@` context string is the enclosing-symbol fallback.
+    scanned. `symbols` is the to-side extractor symbol table (KTD7), used
+    for added and modified hunks; `symbols_from` is the from-side table,
+    preferred for removed hunks so a renamed function does not attribute
+    to a stale name. Without either, the `@@` context string is the
+    enclosing-symbol fallback.
     """
     matcher = matcher or PathMatcher()
     index = _span_index(symbols)
+    index_from = (
+        _span_index(symbols_from) if symbols_from is not None else index
+    )
     out: list[GuardHunk] = []
 
     for f in parse_diff(diff_text):
@@ -331,7 +336,8 @@ def classify_diff(
             else:
                 direction = "modified"
             sign, content = class_lines[0]
-            symbol = _attribute(hunk, path, old_path, index) or hunk.context or None
+            side = index_from if direction == "removed" else index
+            symbol = _attribute(hunk, path, old_path, side) or hunk.context or None
             out.append(
                 GuardHunk(
                     file=path,

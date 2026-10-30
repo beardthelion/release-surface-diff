@@ -59,9 +59,12 @@ def _sources_newer(src_dir: Path, binary: Path) -> bool:
     except OSError:
         return True
     # Skip build output and hidden dirs: target/ alone is thousands of
-    # files on a rust helper that has been built once.
+    # files on a rust helper that has been built once. The check runs on
+    # the path relative to src_dir so a checkout under a dot-directory
+    # does not disable staleness detection.
     for p in src_dir.rglob("*"):
-        if any(part.startswith(".") or part == "target" for part in p.parts):
+        rel_parts = p.relative_to(src_dir).parts
+        if any(part.startswith(".") or part == "target" for part in rel_parts):
             continue
         if p.is_file():
             try:
@@ -77,7 +80,10 @@ def _build(lang: str, src_dir: Path, binary: Path) -> str | None:
     spec = HELPERS[lang]
     if shutil.which(spec["toolchain"]) is None:
         return f"{spec['toolchain']} toolchain not on PATH; cannot build {spec['binary']}"
-    binary.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        binary.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return f"cannot create {binary.parent}: {exc}"
     if lang == "go":
         cmd = [spec["toolchain"], "build", "-o", str(binary), "."]
         artifact = binary
@@ -94,7 +100,10 @@ def _build(lang: str, src_dir: Path, binary: Path) -> str | None:
     if lang == "rust":
         if not artifact.is_file():
             return f"cargo build produced no {artifact.name}"
-        shutil.copy2(artifact, binary)
+        try:
+            shutil.copy2(artifact, binary)
+        except OSError as exc:
+            return f"cannot copy {artifact.name} into {binary.parent}: {exc}"
     return None
 
 

@@ -148,8 +148,6 @@ class TestRunPipeline:
             pb = next(b.rglob(name)).read_text()
             # generated_at is the one intentional non-determinism (R16)
             if name in ("surface.json", "guards.json", "report.md"):
-                pa = pa.replace("generated_at", "G").replace("generated:", "G")
-                pb = pb.replace("generated_at", "G").replace("generated:", "G")
                 import re
                 pa = re.sub(r'"generated_at": "[^"]*"', '"G"', pa)
                 pb = re.sub(r'"generated_at": "[^"]*"', '"G"', pb)

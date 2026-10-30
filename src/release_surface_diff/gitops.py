@@ -1,22 +1,26 @@
 """Git plumbing: repo access, tag resolution, worktrees, diff and log -L.
 
-Local-path repos are used in place; URLs are cloned as `--filter=blob:none`
+Repos are never used in place: URLs are cloned as `--filter=blob:none`
 partial clones so inter-tag history stays available for `git log -L` (KTD4),
 falling back to a shallow fetch of just the tag refs when the remote rejects
-filters. Worktrees are created under a temp dir outside the target repo and
-removed in a finally path plus an atexit backstop (KTD14).
+filters, and local paths are cloned through the file:// transport so a
+hostile repo's .git/config, hooks, and filters cannot execute. Worktrees
+are created under a temp dir outside the target repo and removed in a
+finally path plus an atexit backstop (KTD14).
 """
 
 import atexit
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from ._util import note as _note
+
+GIT_TIMEOUT = 300.0
+CLONE_TIMEOUT = 900.0
 
 
 class GitError(RuntimeError):
@@ -25,6 +29,8 @@ class GitError(RuntimeError):
 
 def run_git(repo: Path | str | None, *args: str, timeout=None) -> str:
     """Run git (optionally with -C repo) and return stdout, or raise GitError."""
+    if timeout is None:
+        timeout = GIT_TIMEOUT
     cmd = ["git"]
     if repo is not None:
         cmd += ["-C", str(repo)]
@@ -45,49 +51,100 @@ def is_url(repo) -> bool:
     return "://" in s or s.startswith("git@")
 
 
+_URL_SCHEMES = ("https", "git", "ssh", "file")
+
+
+def _check_url(url: str) -> None:
+    """Reject URL forms that hand git an option-shaped or odd-protocol arg.
+
+    Only the https/git/ssh/file transports are in scope. Any authority or
+    path component beginning with `-` (ssh option injection, e.g.
+    `ssh://-oProxyCommand=x/y`), and any scp-like `git@host:path` host
+    beginning with `-`, is refused.
+    """
+    s = str(url)
+    if "://" in s:
+        scheme, rest = s.split("://", 1)
+        if scheme not in _URL_SCHEMES:
+            raise GitError(
+                f"unsupported repo URL scheme {scheme!r}; "
+                f"expected one of {_URL_SCHEMES}"
+            )
+        for part in rest.split("/"):
+            if part.startswith("-"):
+                raise GitError(
+                    f"unsafe repo URL component {part!r} in {s!r}"
+                )
+    else:
+        host = s[4:].split(":", 1)[0]
+        if host.startswith("-"):
+            raise GitError(f"unsafe repo URL host {host!r} in {s!r}")
+
+
 @dataclass
 class Repo:
-    """A usable local git repo: either the path the user gave or a clone."""
+    """A usable local git repo: a clone of the path or URL the user gave."""
 
     path: Path
 
 
 def _clone(url: str, dest: Path) -> None:
     """Partial (blobless) clone, falling back to a shallow tag-only fetch."""
-    res = subprocess.run(
-        ["git", "clone", "--filter=blob:none", "--quiet", url, str(dest)],
-        capture_output=True, text=True,
-    )
+    try:
+        res = subprocess.run(
+            ["git", "clone", "--filter=blob:none", "--quiet", "--", url, str(dest)],
+            capture_output=True, text=True, timeout=CLONE_TIMEOUT,
+        )
+    except FileNotFoundError as exc:
+        raise GitError("git is not on PATH") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise GitError(f"git clone timed out after {CLONE_TIMEOUT:g}s") from exc
     if res.returncode == 0:
         return
     shutil.rmtree(dest, ignore_errors=True)
     _note("remote rejected --filter=blob:none; falling back to shallow-by-tag fetch")
-    run_git(None, "init", "-q", str(dest))
-    run_git(dest, "remote", "add", "origin", url)
-    run_git(dest, "fetch", "--depth", "1", "origin", "+refs/tags/*:refs/tags/*")
+    run_git(None, "init", "-q", str(dest), timeout=CLONE_TIMEOUT)
+    run_git(dest, "remote", "add", "origin", "--", url, timeout=CLONE_TIMEOUT)
+    run_git(
+        dest, "fetch", "--depth", "1", "origin", "--",
+        "+refs/tags/*:refs/tags/*", timeout=CLONE_TIMEOUT,
+    )
 
 
 @contextmanager
 def open_repo(repo, clone_base=None):
-    """Yield a Repo. URL repos are cloned under clone_base (or a temp dir) and
-    removed on exit; local paths are validated and used in place."""
+    """Yield a Repo cloned under clone_base (or a temp dir), removed on exit.
+
+    URLs clone blobless via _clone; local paths validate with rev-parse and
+    then clone through `file://` with --no-local, so a hostile repo's
+    .git/config, hooks, and clean/smudge filters never execute during
+    worktree add or git diff.
+    """
     if is_url(repo):
-        base = Path(clone_base) if clone_base else None
-        if base is not None:
-            base.mkdir(parents=True, exist_ok=True)
-        root = Path(tempfile.mkdtemp(prefix="rsd-clone-", dir=base))
-        dest = root / "repo"
-        try:
-            _clone(str(repo), dest)
-            yield Repo(dest)
-        finally:
-            shutil.rmtree(root, ignore_errors=True)
+        _check_url(str(repo))
+        url = str(repo)
     else:
         path = Path(repo)
         if not path.is_dir():
             raise GitError(f"repo path does not exist: {repo}")
         run_git(path, "rev-parse", "--git-dir")
-        yield Repo(path)
+        url = f"file://{path.resolve()}"
+    base = Path(clone_base) if clone_base else None
+    if base is not None:
+        base.mkdir(parents=True, exist_ok=True)
+    root = Path(tempfile.mkdtemp(prefix="rsd-clone-", dir=base))
+    dest = root / "repo"
+    try:
+        if is_url(repo):
+            _clone(url, dest)
+        else:
+            run_git(
+                None, "clone", "--no-local", "--quiet", "--", url, str(dest),
+                timeout=CLONE_TIMEOUT,
+            )
+        yield Repo(dest)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
 
 
 def repo_slug(repo) -> str:
@@ -177,10 +234,18 @@ def resolve_latest(repo, pre: bool = False) -> tuple[str, str]:
 
 
 def _rev_exists(repo, ref: str) -> bool:
-    res = subprocess.run(
-        ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}"],
-        capture_output=True, text=True,
-    )
+    try:
+        res = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet",
+             f"{ref}^{{commit}}"],
+            capture_output=True, text=True, timeout=GIT_TIMEOUT,
+        )
+    except FileNotFoundError as exc:
+        raise GitError("git is not on PATH") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise GitError(
+            f"git rev-parse timed out after {GIT_TIMEOUT:g}s"
+        ) from exc
     return res.returncode == 0
 
 
@@ -234,6 +299,22 @@ def _safe_name(ref: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]", "_", ref)
 
 
+def safe_slug(slug: str) -> str:
+    """repo_slug sanitized for use as a filesystem path component.
+
+    Each `/`-separated segment passes through _safe_name; segments that
+    sanitize to empty, `.`, or `..` are dropped so the result cannot
+    traverse out of the output directory.
+    """
+    parts = []
+    for seg in str(slug).split("/"):
+        safe = _safe_name(seg)
+        if safe in ("", ".", ".."):
+            continue
+        parts.append(safe)
+    return "/".join(parts) or "repo"
+
+
 @contextmanager
 def worktrees(repo, refs, base_dir=None):
     """Yield {ref: worktree Path} for each ref, checked out under a temp dir
@@ -268,8 +349,18 @@ def worktrees(repo, refs, base_dir=None):
 
 
 def git_diff(repo, from_ref: str, to_ref: str, context: int = 5) -> str:
-    """`git diff -U5 <from>..<to>` output; feeds the guard hunk classifier."""
-    return run_git(repo, "diff", f"-U{context}", f"{from_ref}..{to_ref}")
+    """`git diff -U5 <from>..<to>` output; feeds the guard hunk classifier.
+
+    The a/ and b/ prefixes are pinned so attacker- or global-level diff
+    config cannot corrupt the `--- a/` / `+++ b/` headers guards.py parses.
+    """
+    return run_git(
+        repo,
+        "-c", "diff.noprefix=false",
+        "-c", "diff.srcPrefix=a/",
+        "-c", "diff.dstPrefix=b/",
+        "diff", f"-U{context}", f"{from_ref}..{to_ref}",
+    )
 
 
 def log_line_history(

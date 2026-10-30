@@ -3,6 +3,7 @@ package main
 import (
 	"go/ast"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -33,17 +34,19 @@ func extractConfigKeys(p *pkgCtx) []record {
 			roots = append(roots, name)
 		}
 	}
-	// A struct already reached as a nested field of a root is emitted
-	// under that root's prefix; it is not also a standalone root.
-	reached := map[string]bool{}
-	for _, name := range roots {
-		markReached(structs, structs[name], map[string]bool{name: true}, reached)
-	}
+	// A struct already emitted as a nested child of an earlier root's
+	// walk is not also a standalone root. Roots are processed in
+	// sorted order so the choice of surviving root is deterministic;
+	// marking happens per root, so two roots that reference each
+	// other still emit under the first one's prefix.
+	sort.Strings(roots)
+	emitted := map[string]bool{}
 	var out []record
 	for _, name := range roots {
-		if reached[name] && len(roots) > 1 {
+		if emitted[name] {
 			continue
 		}
+		markReached(structs, structs[name], map[string]bool{name: true}, emitted)
 		out = append(out, p.walkStruct(structs, owner, structs[name], "", name,
 			map[string]bool{name: true})...)
 	}
@@ -100,6 +103,10 @@ func structFieldType(e ast.Expr) (string, *ast.StructType) {
 		return structFieldType(t.X)
 	case *ast.ParenExpr:
 		return structFieldType(t.X)
+	case *ast.ArrayType:
+		return structFieldType(t.Elt)
+	case *ast.MapType:
+		return structFieldType(t.Value)
 	}
 	return "", nil
 }

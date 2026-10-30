@@ -12,10 +12,8 @@ non-blank lines (KTD6).
 
 import difflib
 import hashlib
-import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 from . import adapters as _adapters

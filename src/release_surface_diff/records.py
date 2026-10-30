@@ -100,25 +100,6 @@ def protocol_id(literal: str) -> str:
     return literal.strip()
 
 
-def canonical_id(kind: str, **kw) -> str:
-    """Dispatch to the per-kind id builder."""
-    if kind == "route":
-        return route_id(kw.get("method"), kw["template"])
-    if kind == "rpc":
-        return rpc_id(kw["name"])
-    if kind == "cli_flag":
-        return cli_flag_id(kw["name"])
-    if kind == "config_key":
-        return config_key_id(kw["path"])
-    if kind == "export":
-        return export_id(kw["qualified"])
-    if kind == "outbound":
-        return outbound_id(kw["mechanism"], kw["dest_kind"], kw["dest_value"])
-    if kind == "protocol_id":
-        return protocol_id(kw["literal"])
-    raise ValueError(f"unknown record kind {kind!r}; expected one of {KINDS}")
-
-
 # ---- normalized record (R11) ----
 
 

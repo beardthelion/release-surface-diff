@@ -106,7 +106,7 @@ impl Extraction {
                 && a.symbol == b.symbol
         });
         self.symbols.sort_by(|a, b| {
-            (&a.file, a.start_line, &a.symbol).cmp(&(&b.file, b.start_line, &b.symbol))
+            (&a.file, &a.symbol, a.start_line).cmp(&(&b.file, &b.symbol, b.start_line))
         });
         self.symbols
             .dedup_by(|a, b| a.file == b.file && a.symbol == b.symbol);

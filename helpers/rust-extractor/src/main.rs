@@ -40,10 +40,17 @@ fn usage() -> ExitCode {
 /// deterministic output (R16).
 fn walk(dir: &Path, files: &mut Vec<PathBuf>) {
     let Ok(rd) = fs::read_dir(dir) else { return };
-    let mut entries: Vec<PathBuf> = rd.flatten().map(|e| e.path()).collect();
-    entries.sort();
-    for p in entries {
-        if p.is_dir() {
+    let mut entries: Vec<fs::DirEntry> = rd.flatten().collect();
+    entries.sort_by_key(|e| e.path());
+    for e in entries {
+        let Ok(ft) = e.file_type() else { continue };
+        if ft.is_symlink() {
+            // A symlinked dir can point back into the tree and recurse
+            // forever; symlinked files are skipped for the same reason.
+            continue;
+        }
+        let p = e.path();
+        if ft.is_dir() {
             let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if name.starts_with('.') || name == "target" {
                 continue;

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from ._util import write_text
 from .adapters import LOW_CONFIDENCE_ATTR
-from .rank import RankedHunk, iter_delta_records, rank_delta, surface_weight
+from .rank import RankedHunk, rank_delta, surface_weight
 
 ENTRY_KINDS = ("route", "rpc", "protocol_id")
 

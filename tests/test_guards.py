@@ -251,6 +251,82 @@ index 1..2 100644
     ]
 
 
+@pytest.mark.parametrize(
+    "line,hunk_class,direction",
+    [
+        ("+    n = n.wrapping_add(1)", "overflow", "added"),
+        ("-    p = p.canonicalize()", "path", "removed"),
+        ("+    case OpRead: handle(r)", "dispatch", "added"),
+        ("-    deny(req)", "other", "removed"),
+    ],
+)
+def test_classify_diff_representative_lines(line, hunk_class, direction):
+    old_n, new_n = (2, 1) if line.startswith("-") else (1, 2)
+    diff = f"""\
+diff --git a/x.py b/x.py
+index 1..2 100644
+--- a/x.py
++++ b/x.py
+@@ -1,{old_n} +1,{new_n} @@
+ ctx
+{line}
+"""
+    [h] = guards.classify_diff(diff)
+    assert h.hunk_class == hunk_class
+    assert h.direction == direction
+    assert h.evidence == line
+
+
+def test_deleted_file_classifies_on_old_path() -> None:
+    diff = """\
+diff --git a/x.py b/x.py
+index 1..2 100644
+deleted file mode 100644
+--- a/x.py
++++ /dev/null
+@@ -1,2 +0,0 @@
+ ctx
+-    check_perm(u)
+"""
+    [h] = guards.classify_diff(diff)
+    assert h.file == "x.py"
+    assert h.old_file == "x.py"
+    assert h.hunk_class == "auth"
+    assert h.direction == "removed"
+
+
+def test_created_file_classifies_on_new_path() -> None:
+    diff = """\
+diff --git a/x.py b/x.py
+new file mode 100644
+index 0..2
+--- /dev/null
++++ b/x.py
+@@ -0,0 +1,2 @@
++ctx
++    check_perm(u)
+"""
+    [h] = guards.classify_diff(diff)
+    assert h.file == "x.py"
+    assert h.old_file == "x.py"
+    assert h.hunk_class == "auth"
+    assert h.direction == "added"
+
+
+def test_quoted_path_header_unquotes() -> None:
+    diff = (
+        'diff --git "a/h\\303\\251llo.py" "b/h\\303\\251llo.py"\n'
+        "index 1..2 100644\n"
+        '--- "a/h\\303\\251llo.py"\n'
+        '+++ "b/h\\303\\251llo.py"\n'
+        "@@ -1,1 +1,2 @@\n"
+        " ctx\n"
+        "+    check_perm(u)\n"
+    )
+    [h] = guards.classify_diff(diff)
+    assert h.file == "hÃ©llo.py"
+
+
 def test_guards_json_roundtrip(synthetic_repo, tmp_path) -> None:
     repo, _ = synthetic_repo
     doc = guards.guards_json(

@@ -159,12 +159,25 @@ def run_pair(
     diff_text = gitops.git_diff(repo_path, from_tag, to_tag)
     with gitops.worktrees(repo_path, [from_tag, to_tag]) as wts:
         langs = langs or config.detect_languages(wts[to_tag])
+        if not langs:
+            print(
+                "warning: no supported-language manifests found at tree "
+                "root; pass --lang",
+                file=sys.stderr,
+            )
         result_from = extract.extract_tree(
             wts[from_tag], langs, matcher, tools
         )
         result_to = extract.extract_tree(
             wts[to_tag], langs, matcher, tools
         )
+        if not langs:
+            gap = (
+                "no supported-language manifests found at tree root; "
+                "pass --lang"
+            )
+            result_from.gap_notes.append(gap)
+            result_to.gap_notes.append(gap)
         snap_from = diff.Snapshot(
             result_from.records,
             result_from.symbols,
@@ -181,9 +194,11 @@ def run_pair(
             snap_from, snap_to,
             repo=slug, from_ref=from_tag, to_ref=to_tag,
         )
-        symbols = result_from.symbols + result_to.symbols
         edges = result_from.edges + result_to.edges
-    hunks = guards.classify_diff(diff_text, matcher, symbols)
+    hunks = guards.classify_diff(
+        diff_text, matcher, result_to.symbols,
+        symbols_from=result_from.symbols,
+    )
     ranked = rank.rank_hunks(hunks, surface, edges)
     seed_rows = seeds.build_seeds(
         repo_path, repo_arg, hunks, from_tag, to_tag
@@ -200,7 +215,7 @@ def run_pair(
     )
     _report_result(from_tag, result_from)
     _report_result(to_tag, result_to)
-    out_dir = Path(out) / slug / f"{from_tag}..{to_tag}"
+    out_dir = Path(out) / gitops.safe_slug(slug) / f"{from_tag}..{to_tag}"
     diff.write_surface_json(surface, out_dir / "surface.json")
     guards.write_guards_json(guards_doc, out_dir / "guards.json")
     seeds.write_seeds_jsonl(seed_rows, out_dir / "seeds.jsonl")
@@ -210,7 +225,12 @@ def run_pair(
         surface["added"] or surface["removed"] or surface["changed"]
         or surface["renamed"] or hunks
     )
-    degraded = not (result_from.complete and result_to.complete)
+    # An empty lang set means autodetect found no manifest: the run is
+    # degraded so watch does not advance last_tag past this pair.
+    degraded = (
+        not langs
+        or not (result_from.complete and result_to.complete)
+    )
     return (EXIT_DELTA if has_delta else EXIT_NO_DELTA), degraded
 
 
@@ -242,12 +262,19 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
 
 def _reader(root):
-    """Symbol-table body lookup: repo-relative path -> file text (KTD7)."""
-    root = Path(root)
+    """Symbol-table body lookup: repo-relative path -> file text (KTD7).
+
+    Reads that would escape the worktree root (a symlinked or `..` record
+    path in a body_diff lookup) are refused.
+    """
+    root = Path(root).resolve()
 
     def read(path):
         try:
-            return (root / path).read_text(errors="replace")
+            p = (root / path).resolve()
+            if not p.is_relative_to(root):
+                return None
+            return p.read_text(errors="replace")
         except OSError:
             return None
 
@@ -274,6 +301,8 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     _report_result(langs[0], result)
     if not result.records:
         print(f"note: empty inventory for '{langs[0]}'", file=sys.stderr)
+    if not result.complete and not result.records:
+        return EXIT_ERROR
     return EXIT_NO_DELTA
 
 
@@ -293,5 +322,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "watch":
             return _cmd_watch(args)
     except (gitops.GitError, config.ConfigError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    except Exception as exc:
+        # Anything unexpected is still a tool error; leaking the
+        # interpreter's exit 1 would collide with the delta-found code.
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_ERROR

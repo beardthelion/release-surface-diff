@@ -9,7 +9,7 @@ The helper binaries emit protocol ids only for structured registrations
 with non-literal arguments; every bare literal, in every language, comes
 from this pass so each literal yields exactly one record (U5/U8 split).
 
-Entry point: ``extract(root) -> AdapterResult``.
+Entry point: ``extract(root, matcher=None) -> AdapterResult``.
 """
 
 from __future__ import annotations
@@ -128,13 +128,13 @@ def _extract_file(rel: str, text: str, lang: str, result: AdapterResult):
             )
 
 
-def extract(root) -> AdapterResult:
+def extract(root, matcher=None) -> AdapterResult:
     """Scan every source file under ``root`` for protocol-id literals."""
     result = AdapterResult()
     root = Path(root)
-    matcher = PathMatcher()
+    matcher = matcher or PathMatcher()
     for f in sorted(root.rglob("*")):
-        if not f.is_file():
+        if f.is_symlink() or not f.is_file():
             continue
         lang = EXT_LANG.get(f.suffix.lower())
         if lang is None:

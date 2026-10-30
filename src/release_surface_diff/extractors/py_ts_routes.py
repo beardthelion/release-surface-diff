@@ -21,7 +21,7 @@ so records from the two extractors dedupe on ``(kind, id)``. The
 normalization helpers below mirror ``acl_guard_audit/routes.py`` and are
 vendored, not imported: this package must not depend on the sibling tool.
 
-Entry point: ``extract(root) -> AdapterResult`` (consumed by
+Entry point: ``extract(root, matcher=None) -> AdapterResult`` (consumed by
 ``extract._py_ts_routes``).
 """
 
@@ -215,6 +215,8 @@ def _build_prefix_index(root: Path, matcher: PathMatcher) -> dict:
     index: dict[str, str] = {}
     mounts: list[tuple[str, str]] = []
     for py in sorted(root.rglob("*" + _PY_EXT)):
+        if py.is_symlink():
+            continue
         rel = py.relative_to(root).as_posix()
         if not matcher.matches(rel):
             continue
@@ -290,6 +292,9 @@ def _build_prefix_index(root: Path, matcher: PathMatcher) -> dict:
                 if index.get(rel)
                 else own_prefix
             )
+    # A file under a second mount keeps the first prefix applied; joining
+    # again would fabricate ids like /v2/v1/... .
+    mounted: set[str] = set()
     for mod, p in mounts:
         specs = [mod] + ([mod.rsplit(".", 1)[0]] if "." in mod else [])
         for spec in specs:
@@ -301,7 +306,9 @@ def _build_prefix_index(root: Path, matcher: PathMatcher) -> dict:
                 relpath + "/__init__.py",
             ):
                 if (root / cand).exists():
-                    index[cand] = join_prefix(p, index.get(cand, "/"))
+                    if cand not in mounted:
+                        index[cand] = join_prefix(p, index.get(cand, "/"))
+                        mounted.add(cand)
                     applied = True
                     break
             if applied:
@@ -309,8 +316,13 @@ def _build_prefix_index(root: Path, matcher: PathMatcher) -> dict:
             mod_dir = root / relpath
             if mod_dir.is_dir():
                 for f in sorted(mod_dir.rglob("*.py")):
+                    if f.is_symlink():
+                        continue
                     crelp = f.relative_to(root).as_posix()
+                    if crelp in mounted:
+                        continue
                     index[crelp] = join_prefix(p, index.get(crelp, "/"))
+                    mounted.add(crelp)
                 break
     return index
 
@@ -438,6 +450,8 @@ def _py_call_routes(result, rel, node, prefix, parents):
 def _extract_python(root: Path, matcher: PathMatcher, result: AdapterResult):
     prefixes = _build_prefix_index(root, matcher)
     for py in sorted(root.rglob("*" + _PY_EXT)):
+        if py.is_symlink():
+            continue
         rel = py.relative_to(root).as_posix()
         if not matcher.matches(rel):
             continue
@@ -752,7 +766,7 @@ def _extract_ts_file(rel: str, text: str, result: AdapterResult):
 
 def _extract_ts(root: Path, matcher: PathMatcher, result: AdapterResult):
     for f in sorted(root.rglob("*")):
-        if f.suffix not in _TS_EXTS or not f.is_file():
+        if f.is_symlink() or f.suffix not in _TS_EXTS or not f.is_file():
             continue
         rel = f.relative_to(root).as_posix()
         if not matcher.matches(rel):
@@ -768,7 +782,7 @@ def _extract_ts(root: Path, matcher: PathMatcher, result: AdapterResult):
 # ---- entry point ----
 
 
-def extract(root) -> AdapterResult:
+def extract(root, matcher=None) -> AdapterResult:
     """Discover all Python and TS/JS HTTP routes under ``root``.
 
     Returns an AdapterResult so the call site in ``extract.py`` picks up
@@ -776,7 +790,7 @@ def extract(root) -> AdapterResult:
     """
     result = AdapterResult()
     root = Path(root)
-    matcher = PathMatcher()
+    matcher = matcher or PathMatcher()
     _extract_python(root, matcher, result)
     _extract_ts(root, matcher, result)
     return result

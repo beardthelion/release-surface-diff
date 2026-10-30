@@ -58,19 +58,14 @@ def test_protocol_id_is_literal():
     assert records.protocol_id(lit) == lit
 
 
-def test_canonical_id_dispatch():
-    assert records.canonical_id("route", method="get", template="/x") == "GET /x"
-    assert records.canonical_id("rpc", name="m") == "m"
-    assert records.canonical_id("cli_flag", name="f") == "--f"
-    assert records.canonical_id("config_key", path="a.b") == "a.b"
-    assert records.canonical_id("export", qualified="p.E") == "p.E"
-    assert (
-        records.canonical_id("outbound", mechanism="dns", dest_kind="host", dest_value="h")
-        == "dns:host:h"
-    )
-    assert records.canonical_id("protocol_id", literal="/p/1") == "/p/1"
-    with pytest.raises(ValueError):
-        records.canonical_id("nonsense")
+def test_canonical_id_builders():
+    assert records.route_id("get", "/x") == "GET /x"
+    assert records.rpc_id("m") == "m"
+    assert records.cli_flag_id("f") == "--f"
+    assert records.config_key_id("a.b") == "a.b"
+    assert records.export_id("p.E") == "p.E"
+    assert records.outbound_id("dns", "host", "h") == "dns:host:h"
+    assert records.protocol_id("/p/1") == "/p/1"
 
 
 # ---- vocabulary ----

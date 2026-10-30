@@ -104,6 +104,17 @@ class TestShapeTags:
         tags = shape_tags(rec, ranked)
         assert any(t.startswith("dispatch=") for t in tags)
 
+    def test_amplify_tag_from_loop_and_count_evidence(self):
+        rec = surface()["added"][0]
+        ranked = rank_hunks(
+            [
+                hunk(symbol="decodeFoo",
+                     evidence="+ for peer in req.peers: send(msg, len(buf))"),
+            ],
+            surface(), [],
+        )
+        assert "amplify" in shape_tags(rec, ranked)
+
     def test_no_tags_without_evidence(self):
         rec = surface()["added"][1]
         assert shape_tags(rec, []) == []

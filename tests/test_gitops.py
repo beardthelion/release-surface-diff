@@ -129,8 +129,10 @@ def test_diff_capture(tagged_repo: Path) -> None:
 
 
 def test_log_line_history(tagged_repo: Path) -> None:
-    out = gitops.log_line_history(tagged_repo, "v1.1.0", "app.txt", 1, 1)
-    assert "v1.1 contents" in out or "commit" in out.lower()
+    sha = git(tagged_repo, "rev-parse", "v1.0.0^{commit}").strip()
+    out = gitops.log_line_history(tagged_repo, "v1.0.0", "app.txt", 1, 1)
+    assert "v1 contents" in out
+    assert sha in out
 
 
 def test_repo_slug(tagged_repo: Path) -> None:

@@ -17,19 +17,13 @@ deltas found, 2 when a target run fails or the config is invalid.
 
 import json
 import os
-import sys
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config, gitops
-from ._util import note as _note
+from ._util import note as _note, utc_now
 
 STATE_FILE_NAME = "state.json"
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _state_path(config_path, options) -> Path:
@@ -60,7 +54,13 @@ def _load_state(path) -> dict:
     if not isinstance(data, dict):
         _note(f"state file {path} is not a JSON object; starting fresh")
         return {}
-    return data
+    clean = {}
+    for key, val in data.items():
+        if isinstance(val, dict):
+            clean[key] = val
+        else:
+            _note(f"state file {path}: dropping non-object entry for {key!r}")
+    return clean
 
 
 def _write_state(path, state) -> None:
@@ -168,11 +168,13 @@ def check(config_path, *, runner=None) -> int:
     for target in targets:
         key = str(target["repo"])
         entry = dict(state.get(key) or {})
-        entry["last_checked"] = _now()
+        entry["last_checked"] = utc_now()
         try:
             if _check_target(target, entry, runner, default_out):
                 failed = True
-        except (gitops.GitError, config.ConfigError) as exc:
+        except Exception as exc:
+            # One target's unexpected crash must not abort later targets
+            # or skip the state write.
             _note(f"watch: {key}: {exc}")
             entry["last_run_exit"] = 2
             failed = True
