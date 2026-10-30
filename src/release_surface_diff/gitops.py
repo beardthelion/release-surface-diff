@@ -26,16 +26,18 @@ def _note(msg: str) -> None:
     print(f"release-surface-diff: {msg}", file=sys.stderr)
 
 
-def run_git(repo: Path | str | None, *args: str) -> str:
+def run_git(repo: Path | str | None, *args: str, timeout=None) -> str:
     """Run git (optionally with -C repo) and return stdout, or raise GitError."""
     cmd = ["git"]
     if repo is not None:
         cmd += ["-C", str(repo)]
     cmd += list(args)
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except FileNotFoundError as exc:
         raise GitError("git is not on PATH") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise GitError(f"git {' '.join(args)} timed out after {timeout}s") from exc
     if res.returncode != 0:
         raise GitError(f"git {' '.join(args)} failed: {res.stderr.strip()}")
     return res.stdout
@@ -264,11 +266,20 @@ def git_diff(repo, from_ref: str, to_ref: str, context: int = 5) -> str:
     return run_git(repo, "diff", f"-U{context}", f"{from_ref}..{to_ref}")
 
 
-def log_line_history(repo, ref: str, path: str, start: int, end: int) -> str:
+def log_line_history(
+    repo, ref: str, path: str, start: int, end: int,
+    *, first_only: bool = True, timeout=None,
+) -> str:
     """`git log -L<start>,<end>:<path> <ref>`.
 
     Callers pass the from-side ref and from-side line range for hunks that
     removed code (KTD10); falls back to the tag commit in seeds.py when this
-    finds nothing (e.g. on a shallow clone).
+    finds nothing (e.g. on a shallow clone). `first_only` adds `-1`, so the
+    walk stops at the newest touching commit (the attribution answer) instead
+    of replaying the range's whole history; `timeout` bounds each call.
     """
-    return run_git(repo, "log", f"-L{start},{end}:{path}", ref)
+    args = ["log"]
+    if first_only:
+        args.append("-1")
+    args += [f"-L{start},{end}:{path}", ref]
+    return run_git(repo, *args, timeout=timeout)
