@@ -153,8 +153,10 @@ def test_open_repo_file_url_clone(tagged_repo: Path, tmp_path: Path) -> None:
 
 
 def test_cli_run_latest(tagged_repo: Path, capsys) -> None:
+    # v1.0.0..v1.1.0 differs only in app.txt: no surface or guard delta, so
+    # the real pipeline exits 0 (R4) rather than the stub's diff-based 1.
     code = cli.main(["run", "--repo", str(tagged_repo), "--latest"])
-    assert code == cli.EXIT_DELTA  # v1.0.0..v1.1.0 differs
+    assert code == cli.EXIT_NO_DELTA
     listed = git(tagged_repo, "worktree", "list", "--porcelain")
     assert "rsd-worktrees" not in listed
 
