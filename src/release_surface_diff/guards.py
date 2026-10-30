@@ -275,9 +275,10 @@ def _line_classes(content: str) -> list[str]:
 
 
 def _lang_ok(path: str, langs) -> bool:
-    """Whether a file is in scope for `langs` via EXT_LANG. Files with no
-    extension or an unmapped one stay in scope (coverage is not dropped
-    silently); only a file mapped to a different lang is skipped."""
+    """Whether a file is in scope for `langs` via EXT_LANG. When `langs`
+    is empty every file stays in scope; when it is set, only files whose
+    extension maps to a listed lang classify (unmapped extensions and
+    extensionless files drop)."""
     if not langs:
         return True
     return EXT_LANG.get(Path(path).suffix.lower()) in langs

@@ -252,7 +252,6 @@ def diff_snapshots(
             {
                 "before": _record_dict(before.records[i], low),
                 "after": _record_dict(after.records[j], low),
-                # emit pair only when the records actually differ
                 "body_diff": (
                     _unified_diff(
                         before.records[i], before_bodies[i],

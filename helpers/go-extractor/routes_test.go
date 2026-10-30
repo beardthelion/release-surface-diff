@@ -430,3 +430,52 @@ func TestNormRoutePath(t *testing.T) {
 		}
 	}
 }
+
+func TestNestedFactoryMount(t *testing.T) {
+	ctx := extractOne(t, map[string]string{
+		"a.go": `package demo
+
+import (
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+)
+
+func h(w http.ResponseWriter, r *http.Request) {}
+
+func inner(mw func(http.Handler) http.Handler) func(r chi.Router) {
+	return func(r chi.Router) {
+		r.Get("/sessions", h)
+		r.Get("/models", h)
+	}
+}
+
+func outer(mw func(http.Handler) http.Handler) func(r chi.Router) {
+	return inner(mw)
+}
+
+func top(r chi.Router) {
+	r.Route("/api/v2", func(r chi.Router) {
+		r.Route("/aibridge", outer(nil))
+		r.Route("/ai-gateway", outer(nil))
+	})
+}
+`,
+	})
+	ids := recordIDs(extractRoutes(ctx))
+	for _, want := range []string{
+		"route|GET /api/v2/aibridge/sessions",
+		"route|GET /api/v2/aibridge/models",
+		"route|GET /api/v2/ai-gateway/sessions",
+		"route|GET /api/v2/ai-gateway/models",
+	} {
+		if !ids[want] {
+			t.Errorf("missing %s (nested factory should mount), got %v", want, ids)
+		}
+	}
+	for _, id := range []string{"route|GET /sessions", "route|GET /models"} {
+		if ids[id] {
+			t.Errorf("prefixless record %s leaked", id)
+		}
+	}
+}

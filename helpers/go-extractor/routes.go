@@ -1104,18 +1104,25 @@ func (w *routeWalker) subrouterLit(e ast.Expr) *ast.FuncLit {
 
 // routerFactoryLit finds the func literal a same-package factory
 // function returns, when its declared result is func(router, ...).
-// One level only: the factory's own registration body is never
-// re-entered through further calls.
+// A factory may return a literal directly or tail-call another factory
+// (aibridgeHTTPHandler returns aiBridgeRoutes(...)); returns chain
+// through those calls with a bound.
 func (w *routeWalker) routerFactoryLit(call *ast.CallExpr) *ast.FuncLit {
+	return w.factoryLit(call, map[*ast.FuncDecl]bool{})
+}
+
+func (w *routeWalker) factoryLit(call *ast.CallExpr,
+	seen map[*ast.FuncDecl]bool) *ast.FuncLit {
 	id, ok := call.Fun.(*ast.Ident)
 	if !ok {
 		return nil
 	}
 	fd, ok := w.p.funcs[id.Name]
-	if !ok || fd.Body == nil || fd.Type.Results == nil ||
+	if !ok || fd.Body == nil || seen[fd] || fd.Type.Results == nil ||
 		len(fd.Type.Results.List) == 0 {
 		return nil
 	}
+	seen[fd] = true
 	ft, ok := fd.Type.Results.List[0].Type.(*ast.FuncType)
 	if !ok || ft.Params == nil || len(ft.Params.List) == 0 {
 		return nil
@@ -1133,8 +1140,15 @@ func (w *routeWalker) routerFactoryLit(call *ast.CallExpr) *ast.FuncLit {
 			return true
 		}
 		for _, r := range ret.Results {
-			if l, ok := r.(*ast.FuncLit); ok && l.Body != nil {
-				lit = l
+			switch t := r.(type) {
+			case *ast.FuncLit:
+				if t.Body != nil {
+					lit = t
+				}
+			case *ast.CallExpr:
+				lit = w.factoryLit(t, seen)
+			}
+			if lit != nil {
 				return false
 			}
 		}
