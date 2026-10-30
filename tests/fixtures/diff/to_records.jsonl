@@ -1,0 +1,4 @@
+{"kind": "route", "id": "GET /health", "file": "health.py", "line": 1, "symbol": "health", "lang": "python", "extractor": "py-ts-routes@0", "attrs": {}}
+{"kind": "route", "id": "GET /v2/legacy", "file": "legacy.py", "line": 1, "symbol": "legacy", "lang": "python", "extractor": "py-ts-routes@0", "attrs": {}}
+{"kind": "route", "id": "POST /orders", "file": "create_order.py", "line": 1, "symbol": "create_order", "lang": "python", "extractor": "py-ts-routes@0", "attrs": {}}
+{"kind": "cli_flag", "id": "--metrics", "file": "cli.py", "line": 7, "symbol": "metrics_flag", "lang": "python", "extractor": "py-ts-routes@0", "attrs": {}}

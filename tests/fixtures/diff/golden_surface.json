@@ -1,0 +1,79 @@
+{
+  "added": [
+    {
+      "attrs": {},
+      "extractor": "py-ts-routes@0",
+      "file": "cli.py",
+      "id": "--metrics",
+      "kind": "cli_flag",
+      "lang": "python",
+      "line": 7,
+      "symbol": "metrics_flag"
+    }
+  ],
+  "changed": [
+    {
+      "after": {
+        "attrs": {},
+        "extractor": "py-ts-routes@0",
+        "file": "create_order.py",
+        "id": "POST /orders",
+        "kind": "route",
+        "lang": "python",
+        "line": 1,
+        "symbol": "create_order"
+      },
+      "before": {
+        "attrs": {},
+        "extractor": "py-ts-routes@0",
+        "file": "create_order.py",
+        "id": "POST /orders",
+        "kind": "route",
+        "lang": "python",
+        "line": 1,
+        "symbol": "create_order"
+      },
+      "body_diff": "--- a/create_order.py\n+++ b/create_order.py\n@@ -1,4 +1,6 @@\n def create_order(req):\n+    if len(req.items) > MAX_ITEMS:\n+        abort(400)\n     order = parse(req)\n     db.save(order)\n     return {\"id\": order.id}"
+    }
+  ],
+  "from": "v1.0.0",
+  "generated_at": "2026-10-29T00:00:00Z",
+  "removed": [
+    {
+      "attrs": {},
+      "extractor": "py-ts-routes@0",
+      "file": "list_users.py",
+      "id": "GET /users/{id}",
+      "kind": "route",
+      "lang": "python",
+      "line": 1,
+      "symbol": "list_users"
+    }
+  ],
+  "renamed": [
+    {
+      "after": {
+        "attrs": {},
+        "extractor": "py-ts-routes@0",
+        "file": "legacy.py",
+        "id": "GET /v2/legacy",
+        "kind": "route",
+        "lang": "python",
+        "line": 1,
+        "symbol": "legacy"
+      },
+      "before": {
+        "attrs": {},
+        "extractor": "py-ts-routes@0",
+        "file": "legacy.py",
+        "id": "GET /legacy",
+        "kind": "route",
+        "lang": "python",
+        "line": 1,
+        "symbol": "legacy"
+      }
+    }
+  ],
+  "repo": "acme/widget",
+  "to": "v1.1.0"
+}
