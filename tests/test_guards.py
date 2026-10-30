@@ -226,10 +226,8 @@ index 1..2 100644
     )
     hunks = guards.classify_diff(diff, langs={"go"})
     # .py maps to another lang and drops; .yaml/.ps1 and no-extension
-    # files have no EXT_LANG mapping and stay in scope
-    assert sorted(h.file for h in hunks) == [
-        "Makefile", "deploy.yaml", "main.go", "note.ps1",
-    ]
+    # files have no EXT_LANG mapping and drop under --lang
+    assert sorted(h.file for h in hunks) == ["main.go"]
     hunks_all = guards.classify_diff(diff)
     assert len(hunks_all) == 5
 

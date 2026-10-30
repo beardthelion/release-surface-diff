@@ -280,8 +280,7 @@ def _lang_ok(path: str, langs) -> bool:
     silently); only a file mapped to a different lang is skipped."""
     if not langs:
         return True
-    lang = EXT_LANG.get(Path(path).suffix.lower())
-    return lang is None or lang in langs
+    return EXT_LANG.get(Path(path).suffix.lower()) in langs
 
 
 def _span_index(symbols) -> dict[str, list[SymbolSpan]]:

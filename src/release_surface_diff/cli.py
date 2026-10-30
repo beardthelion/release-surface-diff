@@ -157,6 +157,10 @@ def run_pair(
     matcher = _matcher(include, exclude)
     tools = tools or extract.ToolPaths()
     slug = gitops.repo_slug(repo_arg)
+    if not gitops.is_url(str(repo_arg)):
+        origin = gitops.origin_url(repo_arg)
+        if origin:
+            slug = gitops.repo_slug(origin)
     generated_at = utc_now()
     diff_text = gitops.git_diff(repo_path, from_tag, to_tag)
     with gitops.worktrees(repo_path, [from_tag, to_tag]) as wts:

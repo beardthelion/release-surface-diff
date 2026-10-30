@@ -763,6 +763,8 @@ func (w *routeWalker) scanExpr(n ast.Node, scope *routeScope) {
 			return false
 		}
 		switch x := node.(type) {
+		case *ast.FuncLit:
+			return false
 		case *ast.CallExpr:
 			w.tryRouteCall(x, scope)
 		case *ast.ExprStmt:

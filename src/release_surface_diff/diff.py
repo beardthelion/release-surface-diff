@@ -233,6 +233,12 @@ def diff_snapshots(
     added.sort(key=lambda j: record_sort_key(after.records[j]))
     removed.sort(key=lambda i: record_sort_key(before.records[i]))
     changed.sort(key=lambda pair: record_sort_key(after.records[pair[1]]))
+    changed = [
+        (i, j) for i, j in changed
+        if _record_dict(before.records[i], low)
+        != _record_dict(after.records[j], low)
+        or before_bodies[i] != after_bodies[j]
+    ]
     rename_pairs.sort(key=lambda pair: record_sort_key(after.records[pair[1]]))
 
     return {
@@ -246,6 +252,7 @@ def diff_snapshots(
             {
                 "before": _record_dict(before.records[i], low),
                 "after": _record_dict(after.records[j], low),
+                # emit pair only when the records actually differ
                 "body_diff": (
                     _unified_diff(
                         before.records[i], before_bodies[i],
