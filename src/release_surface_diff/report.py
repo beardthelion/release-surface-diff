@@ -15,8 +15,16 @@ ENTRY_KINDS = ("route", "rpc", "protocol_id")
 def _entry_records(surface: dict) -> dict[str, list]:
     """Delta lists restricted to entry-point kinds (route/rpc/protocol_id)."""
     ranked = rank_delta(surface)
+
+    def kind_of(item: dict) -> str:
+        # changed/renamed entries are {before, after} pairs; the after side
+        # carries the kind when both differ.
+        if "after" in item or "before" in item:
+            return _rec_kind(item.get("after") or item.get("before") or {})
+        return _rec_kind(item)
+
     return {
-        bucket: [r for r in ranked[bucket] if _rec_kind(r) in ENTRY_KINDS]
+        bucket: [r for r in ranked[bucket] if kind_of(r) in ENTRY_KINDS]
         for bucket in ("added", "removed", "changed", "renamed")
     }
 
