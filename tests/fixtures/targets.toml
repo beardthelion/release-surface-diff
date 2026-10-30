@@ -1,0 +1,15 @@
+# Example watch config. Tests copy this shape into a tmp dir and point
+# `repo` at a temp git repo; state.json is written next to this file
+# unless `state_file` overrides it (relative paths resolve against the
+# config directory). `out` sets where pair outputs are written.
+out = "out"
+
+[[target]]
+repo = "/path/to/target-repo"
+lang = ["go", "python"]
+include = ["src/**", "app/**"]
+exclude = ["**/fixtures/**"]
+
+[[target]]
+repo = "https://example.com/owner/name"
+lang = ["rust"]

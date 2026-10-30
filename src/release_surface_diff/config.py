@@ -105,8 +105,12 @@ def detect_languages(root: Path) -> tuple[str, ...]:
     return tuple(lang for lang in LANGS if lang in found)
 
 
-def load_targets(path) -> list[dict]:
-    """Parse `targets.toml` for `watch` (U9 owns the run semantics)."""
+def load_watch_config(path) -> tuple[list[dict], dict]:
+    """(targets, options) from targets.toml for `watch` (U9).
+
+    `targets` is the validated [[target]] list; `options` carries the other
+    top-level keys (`state_file`, `out`) that steer the check itself.
+    """
     p = Path(path)
     if not p.is_file():
         raise ConfigError(f"targets file not found: {path}")
@@ -120,4 +124,11 @@ def load_targets(path) -> list[dict]:
             raise ConfigError(f"targets file {path}: target #{i + 1} has no repo")
         if "lang" in target:
             parse_langs(target["lang"])  # validate tokens now, not at run time
+    options = {k: v for k, v in data.items() if k != "target"}
+    return targets, options
+
+
+def load_targets(path) -> list[dict]:
+    """Parse `targets.toml` for `watch` (U9 owns the run semantics)."""
+    targets, _options = load_watch_config(path)
     return targets

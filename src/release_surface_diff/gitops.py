@@ -153,21 +153,31 @@ def _sorted_parseable_tags(repo) -> list[tuple[tuple, str]]:
     return parsed
 
 
+def release_tags(repo, pre: bool = False) -> list[str]:
+    """All parseable tags in tolerant semver order, oldest first.
+
+    Pre-releases are excluded unless pre=True, matching --latest; anything
+    unparseable is skipped with a note.
+    """
+    parsed = _sorted_parseable_tags(repo)
+    if not pre:
+        parsed = [item for item in parsed if item[0][3] == 1]
+    return [tag for _key, tag in parsed]
+
+
 def resolve_latest(repo, pre: bool = False) -> tuple[str, str]:
     """The newest two tags in tolerant semver order: (from, to).
 
     Pre-releases are ignored unless pre=True. Fewer than two parseable tags
     is a tool error.
     """
-    parsed = _sorted_parseable_tags(repo)
-    if not pre:
-        parsed = [item for item in parsed if item[0][3] == 1]
-    if len(parsed) < 2:
+    tags = release_tags(repo, pre=pre)
+    if len(tags) < 2:
         scope = "parseable tags" if pre else "release tags"
         raise GitError(
             f"fewer than two {scope} in {repo}; pass --from/--to explicitly"
         )
-    return parsed[-2][1], parsed[-1][1]
+    return tags[-2], tags[-1]
 
 
 def _rev_exists(repo, ref: str) -> bool:

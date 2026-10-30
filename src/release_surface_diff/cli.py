@@ -121,14 +121,97 @@ def _report_result(tag: str, result) -> None:
         print(f"note [{tag}]: {note}", file=sys.stderr)
 
 
-def _matcher(args) -> config.PathMatcher:
+def _matcher(include=(), exclude=None) -> config.PathMatcher:
     # --exclude globs add to the built-in defaults rather than replacing them:
     # a security tool should not re-include tests/vendor because a caller
     # passed one extra pattern.
     return config.PathMatcher(
-        include=args.include,
-        exclude=tuple(config.DEFAULT_EXCLUDE) + tuple(args.exclude or ()),
+        include=include,
+        exclude=tuple(config.DEFAULT_EXCLUDE) + tuple(exclude or ()),
     )
+
+
+def run_pair(
+    repo_arg,
+    repo_path,
+    from_tag: str,
+    to_tag: str,
+    *,
+    langs=(),
+    include=(),
+    exclude=None,
+    out="out",
+    tools=None,
+) -> tuple[int, bool]:
+    """Diff one tag pair of an already-open repo and write the outputs.
+
+    The shared pipeline behind `run` (explicit pair or --latest) and
+    `watch` (KTD9): repo_arg is the user-supplied --repo value whose slug
+    names the outputs and the seeds `repo` field; repo_path is the local
+    checkout git queries run against. Returns (exit_code, degraded): exit
+    0 for no delta, 1 for a delta; degraded marks a side that extracted
+    with a missing or partial tool, so the delta is low-confidence and
+    watch must not advance last_tag past this pair.
+    """
+    matcher = _matcher(include, exclude)
+    tools = tools or extract.ToolPaths()
+    slug = gitops.repo_slug(repo_arg)
+    diff_text = gitops.git_diff(repo_path, from_tag, to_tag)
+    with gitops.worktrees(repo_path, [from_tag, to_tag]) as wts:
+        langs = langs or config.detect_languages(wts[to_tag])
+        result_from = extract.extract_tree(
+            wts[from_tag], langs, matcher, tools
+        )
+        result_to = extract.extract_tree(
+            wts[to_tag], langs, matcher, tools
+        )
+        snap_from = diff.Snapshot(
+            result_from.records,
+            result_from.symbols,
+            _reader(wts[from_tag]),
+            low_confidence=not result_from.complete,
+        )
+        snap_to = diff.Snapshot(
+            result_to.records,
+            result_to.symbols,
+            _reader(wts[to_tag]),
+            low_confidence=not result_to.complete,
+        )
+        surface = diff.diff_snapshots(
+            snap_from, snap_to,
+            repo=slug, from_ref=from_tag, to_ref=to_tag,
+        )
+        symbols = result_from.symbols + result_to.symbols
+        edges = result_from.edges + result_to.edges
+    hunks = guards.classify_diff(diff_text, matcher, symbols)
+    ranked = rank.rank_hunks(hunks, surface, edges)
+    seed_rows = seeds.build_seeds(
+        repo_path, repo_arg, hunks, from_tag, to_tag
+    )
+    guards_doc = guards.guards_json(
+        hunks, repo=slug, from_ref=from_tag, to_ref=to_tag
+    )
+    generated_at = surface["generated_at"]
+    gap_notes = result_from.gap_notes + result_to.gap_notes
+    report_text = report.build_report(
+        surface, ranked, gap_notes,
+        repo=slug, from_ref=from_tag, to_ref=to_tag,
+        generated_at=generated_at,
+    )
+    _report_result(from_tag, result_from)
+    _report_result(to_tag, result_to)
+    out_dir = Path(out) / slug / f"{from_tag}..{to_tag}"
+    diff.write_surface_json(surface, out_dir / "surface.json")
+    guards.write_guards_json(guards_doc, out_dir / "guards.json")
+    seeds.write_seeds_jsonl(seed_rows, out_dir / "seeds.jsonl")
+    report.write_report(report_text, out_dir / "report.md")
+    print(f"{from_tag}..{to_tag}: outputs in {out_dir}")
+    has_delta = bool(
+        surface["added"] or surface["removed"] or surface["changed"]
+        or surface["renamed"] or hunks
+    )
+    degraded = not (result_from.complete and result_to.complete)
+    return (EXIT_DELTA if has_delta else EXIT_NO_DELTA), degraded
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
@@ -142,9 +225,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         print("error: --pre only applies with --latest", file=sys.stderr)
         return EXIT_ERROR
     langs = config.parse_langs(args.lang)
-    matcher = _matcher(args)
     tools = _tools(args)
-    slug = gitops.repo_slug(args.repo)
     with gitops.open_repo(args.repo) as repo:
         if args.latest:
             from_tag, to_tag = gitops.resolve_latest(repo.path, pre=args.pre)
@@ -152,61 +233,12 @@ def _cmd_run(args: argparse.Namespace) -> int:
             from_tag, to_tag = gitops.resolve_pair(
                 repo.path, args.from_tag, args.to_tag
             )
-        diff_text = gitops.git_diff(repo.path, from_tag, to_tag)
-        with gitops.worktrees(repo.path, [from_tag, to_tag]) as wts:
-            langs = langs or config.detect_languages(wts[to_tag])
-            result_from = extract.extract_tree(
-                wts[from_tag], langs, matcher, tools
-            )
-            result_to = extract.extract_tree(
-                wts[to_tag], langs, matcher, tools
-            )
-            snap_from = diff.Snapshot(
-                result_from.records,
-                result_from.symbols,
-                _reader(wts[from_tag]),
-                low_confidence=not result_from.complete,
-            )
-            snap_to = diff.Snapshot(
-                result_to.records,
-                result_to.symbols,
-                _reader(wts[to_tag]),
-                low_confidence=not result_to.complete,
-            )
-            surface = diff.diff_snapshots(
-                snap_from, snap_to,
-                repo=slug, from_ref=from_tag, to_ref=to_tag,
-            )
-            symbols = result_from.symbols + result_to.symbols
-            edges = result_from.edges + result_to.edges
-        hunks = guards.classify_diff(diff_text, matcher, symbols)
-        ranked = rank.rank_hunks(hunks, surface, edges)
-        seed_rows = seeds.build_seeds(
-            repo.path, args.repo, hunks, from_tag, to_tag
+        code, _degraded = run_pair(
+            args.repo, repo.path, from_tag, to_tag,
+            langs=langs, include=args.include, exclude=args.exclude,
+            out=args.out, tools=tools,
         )
-        guards_doc = guards.guards_json(
-            hunks, repo=slug, from_ref=from_tag, to_ref=to_tag
-        )
-        generated_at = surface["generated_at"]
-        gap_notes = result_from.gap_notes + result_to.gap_notes
-        report_text = report.build_report(
-            surface, ranked, gap_notes,
-            repo=slug, from_ref=from_tag, to_ref=to_tag,
-            generated_at=generated_at,
-        )
-    _report_result(from_tag, result_from)
-    _report_result(to_tag, result_to)
-    out_dir = Path(args.out) / slug / f"{from_tag}..{to_tag}"
-    diff.write_surface_json(surface, out_dir / "surface.json")
-    guards.write_guards_json(guards_doc, out_dir / "guards.json")
-    seeds.write_seeds_jsonl(seed_rows, out_dir / "seeds.jsonl")
-    report.write_report(report_text, out_dir / "report.md")
-    print(f"{from_tag}..{to_tag}: outputs in {out_dir}")
-    has_delta = bool(
-        surface["added"] or surface["removed"] or surface["changed"]
-        or surface["renamed"] or hunks
-    )
-    return EXIT_DELTA if has_delta else EXIT_NO_DELTA
+    return code
 
 
 def _reader(root):
@@ -235,7 +267,7 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     if not langs:
         print("error: --lang needs a language (go, rust, python, ts)", file=sys.stderr)
         return EXIT_ERROR
-    matcher = _matcher(args)
+    matcher = _matcher(args.include, args.exclude)
     result = extract.extract_lang(root, langs[0], matcher, _tools(args))
     for rec in sorted(result.records, key=record_sort_key):
         print(rec.to_json())
@@ -246,13 +278,9 @@ def _cmd_extract(args: argparse.Namespace) -> int:
 
 
 def _cmd_watch(args: argparse.Namespace) -> int:
-    try:
-        config.load_targets(args.config)
-    except config.ConfigError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return EXIT_ERROR
-    print("watch is not implemented yet (lands in U9)", file=sys.stderr)
-    return EXIT_ERROR
+    from . import watch
+
+    return watch.check(args.config)
 
 
 def main(argv: list[str] | None = None) -> int:
