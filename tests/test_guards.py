@@ -187,6 +187,53 @@ def test_context_fallback_symbol() -> None:
     assert h.symbol == "def f():"
 
 
+def test_comment_only_lines_not_classified() -> None:
+    # guard-shaped text inside comments carries no class/direction
+    diff = """\
+diff --git a/x.go b/x.go
+index 1..2 100644
+--- a/x.go
++++ b/x.go
+@@ -1,3 +1,5 @@
+ ctx
+-// check_perm(u) was here
++// check_perm(u) is gone
++/* len(b) > max_len */
++* canonicalize(p)
+ ctx2
+"""
+    assert guards.classify_diff(diff) == []
+    # a real change alongside a matching comment still classifies
+    diff2 = diff.replace(" ctx2\n", "+    check_perm(u)\n ctx2\n")
+    [h] = guards.classify_diff(diff2)
+    assert h.direction == "added"
+    assert h.evidence == "+    check_perm(u)"
+
+
+def test_langs_filter_skips_other_lang_files() -> None:
+    file_diff = """\
+diff --git a/{p} b/{p}
+index 1..2 100644
+--- a/{p}
++++ b/{p}
+@@ -1,1 +1,2 @@
+ ctx
++    check_perm(u)
+"""
+    diff = "".join(
+        file_diff.format(p=p)
+        for p in ("deploy.yaml", "main.go", "app.py", "Makefile", "note.ps1")
+    )
+    hunks = guards.classify_diff(diff, langs={"go"})
+    # .py maps to another lang and drops; .yaml/.ps1 and no-extension
+    # files have no EXT_LANG mapping and stay in scope
+    assert sorted(h.file for h in hunks) == [
+        "Makefile", "deploy.yaml", "main.go", "note.ps1",
+    ]
+    hunks_all = guards.classify_diff(diff)
+    assert len(hunks_all) == 5
+
+
 def test_excluded_paths_not_classified() -> None:
     file_diff = """\
 diff --git a/{p} b/{p}
@@ -493,6 +540,61 @@ def test_removed_seed_with_shifting_lines_after_removal(tmp_path) -> None:
     [seed] = seeds_mod.build_seeds(repo, str(repo), [hunk], "v1.0.0", "v1.1.0")
     assert seed["sha"] == c2
     assert seed["parent"] == c1
+
+
+def test_merge_base_attribution_diverged_tags(tmp_path) -> None:
+    """Release-branch pair: v1.0.0 on one branch, v1.1.0 on a second
+    branch off the same base. from is not an ancestor of to, so
+    attribution must run over merge-base..to: the removed hunk lands on
+    the divergent commit that rewrote that region, the added hunk on its
+    introducing commit, with no tag fallback."""
+    from release_surface_diff import seeds as seeds_mod
+
+    repo = init_repo(tmp_path / "repo")
+    base_body = (
+        ["def f():"]
+        + [f"    x{i:02d}" for i in range(1, 29)]
+        + ["    return 1"]
+    )
+    write_all(repo, {"app.py": "\n".join(base_body) + "\n"}, "base")
+    base = git(repo, "rev-parse", "HEAD").strip()
+
+    # branch one: insert a guard near the top, tag v1.0.0
+    git(repo, "checkout", "-qb", "rel-a")
+    body_a = base_body[:10] + ["    check_perm(u)"] + base_body[10:]
+    write_all(repo, {"app.py": "\n".join(body_a) + "\n"}, "add guard")
+    git(repo, "tag", "v1.0.0")
+
+    # branch two off the base: rewrite the same region (removing those
+    # base lines), then add a different guard near the bottom
+    git(repo, "checkout", "-qb", "rel-b", base)
+    body_b = (
+        base_body[:9]
+        + ["    rewritten = 2"]
+        + base_body[12:]
+        + ["    if len(b) > MAX_B:", "        raise"]
+    )
+    write_all(repo, {"app.py": "\n".join(body_b) + "\n"}, "rewrite region")
+    d1 = git(repo, "rev-parse", "HEAD").strip()
+    body_b2 = body_b[:-2] + ["    if len(b) > MAX_C:", "        raise"] + body_b[-2:]
+    write_all(repo, {"app.py": "\n".join(body_b2) + "\n"}, "add guard")
+    d2 = git(repo, "rev-parse", "HEAD").strip()
+    git(repo, "tag", "v1.1.0")
+
+    assert git(repo, "merge-base", "v1.0.0", "v1.1.0").strip() == base
+
+    diff_text = gitops.git_diff(repo, "v1.0.0", "v1.1.0")
+    hunks = guards.classify_diff(diff_text)
+    assert len(hunks) == 2  # the removed guard and the added guard
+    seeds_out = seeds_mod.build_seeds(
+        repo, str(repo), hunks, "v1.0.0", "v1.1.0"
+    )
+    by_dir = {h.direction: (h, s) for h, s in zip(hunks, seeds_out)}
+    removed, added = by_dir["removed"], by_dir["added"]
+    assert removed[1]["sha"] == d1          # the region-rewriting commit
+    assert added[1]["sha"] == d2            # the guard-introducing commit
+    assert "attribution" not in removed[1]  # no tag fallback
+    assert "attribution" not in added[1]
 
 
 def test_seed_repo_uses_origin_owner_name(tmp_path) -> None:

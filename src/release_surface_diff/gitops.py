@@ -111,6 +111,21 @@ def _clone(url: str, dest: Path) -> None:
     )
 
 
+def _is_partial_clone(path) -> bool:
+    """True when the repo has a promisor/partial-clone extension configured."""
+    for key in (
+        "remote.origin.promisor",
+        "remote.origin.partialclonefilter",
+        "extensions.partialclone",
+    ):
+        try:
+            if run_git(path, "config", "--get", key).strip():
+                return True
+        except GitError:
+            continue
+    return False
+
+
 @contextmanager
 def open_repo(repo, clone_base=None):
     """Yield a Repo cloned under clone_base (or a temp dir), removed on exit.
@@ -138,10 +153,23 @@ def open_repo(repo, clone_base=None):
         if is_url(repo):
             _clone(url, dest)
         else:
+            if _is_partial_clone(path):
+                # A partial clone cannot serve its missing blobs over
+                # file:// upload-pack, so the copy dies mid-clone. Use the
+                # source directly: promisor fetches reach the real remote
+                # recorded in its config.
+                yield Repo(path)
+                return
+            # A blobless source clone makes the file:// clone's origin
+            # useless for promisor fetches; point it back at the real
+            # remote so missing objects resolve (KTD4).
+            origin = origin_url(path)
             run_git(
                 None, "clone", "--no-local", "--quiet", "--", url, str(dest),
                 timeout=CLONE_TIMEOUT,
             )
+            if origin and origin != url:
+                run_git(dest, "remote", "set-url", "origin", "--", origin)
         yield Repo(dest)
     finally:
         shutil.rmtree(root, ignore_errors=True)
@@ -367,16 +395,48 @@ def blame_reverse(
     repo, from_ref: str, to_ref: str, path: str, start: int, end: int,
     *, timeout=None,
 ) -> str:
-    """`git blame --reverse from..to` over the from-side line range.
+    """`git blame --reverse from..to` over the range-start line range.
 
     Reverse blame attributes each line to the last commit in the range where
     it still existed; the child of that commit on the first-parent path is
-    the commit that removed it.
+    the commit that removed it. Callers pass the merge base as `from_ref`
+    when the tags sit on diverged branches.
     """
     return run_git(
         repo, "blame", "--porcelain", "--reverse", f"{from_ref}..{to_ref}",
         "-L", f"{start},{end}", "--", path, timeout=timeout,
     )
+
+
+def merge_base(repo, a: str, b: str, *, timeout=None) -> "str | None":
+    """`git merge-base a b`, or None when the refs share no ancestor.
+
+    Release-branch pairs (a from tag that is not an ancestor of the to
+    tag) need the base so line-history ranges cover the commits that
+    actually diverged.
+    """
+    try:
+        out = run_git(repo, "merge-base", a, b, timeout=timeout).strip()
+    except GitError:
+        return None
+    return out or None
+
+
+def path_touching_commit(repo, rev: str, path: str, *, timeout=None) -> "str | None":
+    """Newest commit on `rev` that touched `path`, or None.
+
+    Used as the attribution fallback when line-range lookups (log -L,
+    reverse blame) fail, typically because the path was added or deleted
+    inside the range.
+    """
+    try:
+        out = run_git(
+            repo, "log", "-1", "--format=%H", rev, "--", path,
+            timeout=timeout,
+        ).strip()
+    except GitError:
+        return None
+    return out or None
 
 
 def first_parent_chain(repo, from_ref: str, to_ref: str, *, timeout=None) -> list[str]:

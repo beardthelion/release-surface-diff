@@ -26,6 +26,13 @@ DEFAULT_EXCLUDE = (
     "**/tests/**", "**/test/**", "**/testdata/**",
     "*_test.go", "*_test.py", "test_*.py", "*_test.rs",
     "*.test.*", "*.spec.*",
+    # scripts and test-helper trees
+    "scripts/**", "**/scripts/**",
+    "apptest/**", "**/apptest/**",
+    "testutil/**", "**/testutil/**",
+    "test_helpers/**", "**/test_helpers/**",
+    "e2e/**", "**/e2e/**",
+    "integration/**", "**/integration/**",
     # vendored / dependency trees
     "vendor/**", "**/vendor/**",
     "third_party/**", "**/third_party/**",

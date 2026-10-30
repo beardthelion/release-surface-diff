@@ -200,7 +200,7 @@ def run_pair(
         edges = result_from.edges + result_to.edges
     hunks = guards.classify_diff(
         diff_text, matcher, result_to.symbols,
-        symbols_from=result_from.symbols,
+        symbols_from=result_from.symbols, langs=set(langs),
     )
     ranked = rank.rank_hunks(hunks, surface, edges)
     seed_rows = seeds.build_seeds(

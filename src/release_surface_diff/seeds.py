@@ -31,13 +31,16 @@ SOURCE = "release-diff"
 # Per-call bound and per-run cap on `git log -L` lookups; hunks past the cap
 # fall back to the tag commit rather than stalling the run.
 LOG_L_TIMEOUT = 15.0
-MAX_LOG_L_CALLS = 200
+MAX_LOG_L_CALLS = 2000
 
 _COMMIT_RE = re.compile(r"^commit ([0-9a-f]{40})\b", re.MULTILINE)
 
 
-def _hunk_lookup(hunk: GuardHunk, from_ref: str, to_ref: str):
-    """(ref, path, start, end) for the `log -L` attribution of one hunk.
+def _hunk_lookup(hunk: GuardHunk, base_ref: str, to_ref: str):
+    """(rev-range, path, start, end) for the `log -L` attribution of one
+    hunk. The range runs from the merge base of the tag pair so commits on
+    the to side are covered even when the tags diverged (release
+    branches).
 
     Removed hunks resolve on the from side: their lines do not exist at the
     to tag, so history must be traced where they still lived (KTD10). Added
@@ -47,7 +50,7 @@ def _hunk_lookup(hunk: GuardHunk, from_ref: str, to_ref: str):
     # range at the tip, which is where those lines live. Removed lines are
     # gone at the tip, so to-side numbers are meaningless there; they go
     # through `_removing_commit` instead (spec R15).
-    rev = f"{from_ref}..{to_ref}"
+    rev = f"{base_ref}..{to_ref}"
     if hunk.direction == "removed":
         end = hunk.old_start + hunk.old_count - 1
         return rev, hunk.old_file, hunk.old_start, end
@@ -65,38 +68,47 @@ def _introducing_commit(repo, ref: str, path: str, start: int, end: int,
             repo, ref, path, start, end, timeout=timeout
         )
     except GitError:
-        return None
+        out = ""
     m = _COMMIT_RE.search(out)
-    return m.group(1) if m else None
+    if m:
+        return m.group(1)
+    # -L cannot resolve lines in a file created or deleted inside the
+    # range; the newest path-touching commit is the real answer there.
+    return gitops.path_touching_commit(repo, ref, path, timeout=timeout)
 
 
 _BLAME_SHA_RE = re.compile(r"^\^?([0-9a-f]{40})\b", re.MULTILINE)
 
 
-def _removing_commit(repo, from_ref: str, to_ref: str, path: str,
+def _removing_commit(repo, base_ref: str, to_ref: str, path: str,
                      start: int, end: int, timeout) -> "str | None":
-    """The first-parent child, within from..to, of the last commit where the
+    """The first-parent child, within base..to, of the last commit where the
     removed lines still existed (reverse blame), or None when unresolvable."""
     if start <= 0 or end < start:
         return None
     try:
         blame = gitops.blame_reverse(
-            repo, from_ref, to_ref, path, start, end, timeout=timeout
+            repo, base_ref, to_ref, path, start, end, timeout=timeout
         )
-        chain = gitops.first_parent_chain(repo, from_ref, to_ref, timeout=timeout)
-        from_sha = gitops.resolve_commit(repo, from_ref)
+        chain = gitops.first_parent_chain(repo, base_ref, to_ref, timeout=timeout)
+        base_sha = gitops.resolve_commit(repo, base_ref)
     except GitError:
-        return None
-    # child_on_path[sha] = sha's successor on the first-parent path, where the
-    # path begins at the from-side commit itself.
-    order = [from_sha] + chain
-    child_on_path = {s: order[i + 1] for i, s in enumerate(order)
-                     if i + 1 < len(order)}
-    for last_seen in _BLAME_SHA_RE.findall(blame):
-        child = child_on_path.get(last_seen)
-        if child:
-            return child
-    return None
+        blame = None
+    if blame is not None:
+        # child_on_path[sha] = sha's successor on the first-parent path,
+        # where the path begins at the base commit itself.
+        order = [base_sha] + chain
+        child_on_path = {s: order[i + 1] for i, s in enumerate(order)
+                         if i + 1 < len(order)}
+        for last_seen in _BLAME_SHA_RE.findall(blame):
+            child = child_on_path.get(last_seen)
+            if child:
+                return child
+    # Deleted-file hunks (or blame failures) resolve through the newest
+    # path-touching commit in the range, which is the deleter.
+    return gitops.path_touching_commit(
+        repo, f"{base_ref}..{to_ref}", path, timeout=timeout
+    )
 
 
 def _first_parent(repo, sha: str, cache: "dict | None" = None) -> "str | None":
@@ -119,23 +131,27 @@ def seed_for_hunk(
     *,
     repo_path,
     repo_name: str,
-    from_ref: str,
+    base_ref: str,
     to_ref: str,
     to_commit: "str | None" = None,
     allow_lookup: bool = True,
     timeout=LOG_L_TIMEOUT,
     parent_cache: "dict | None" = None,
 ) -> dict:
-    """One seeds.jsonl record for a classified hunk."""
+    """One seeds.jsonl record for a classified hunk.
+
+    `base_ref` is the merge base of the tag pair (from_ref when the tags
+    are linear); every history lookup runs over base..to.
+    """
     repo_path = Path(repo_path)
     if to_commit is None:
         to_commit = gitops.resolve_commit(repo_path, to_ref)
     sha = None
     if allow_lookup:
-        ref, path, start, end = _hunk_lookup(hunk, from_ref, to_ref)
+        ref, path, start, end = _hunk_lookup(hunk, base_ref, to_ref)
         if hunk.direction == "removed":
             sha = _removing_commit(
-                repo_path, from_ref, to_ref, path, start, end, timeout
+                repo_path, base_ref, to_ref, path, start, end, timeout
             )
         else:
             sha = _introducing_commit(
@@ -187,6 +203,11 @@ def build_seeds(
         if origin:
             repo_name = gitops.repo_slug(origin)
     to_commit = gitops.resolve_commit(repo_path, to_ref)
+    # Release branches diverge: from_ref is not an ancestor of to_ref, so
+    # from..to would exclude the commits the diff is actually made of.
+    # The merge base is the range start for every lookup; when the refs
+    # share no ancestor, from_ref is the least-wrong fallback.
+    base = gitops.merge_base(repo_path, from_ref, to_ref) or from_ref
     parent_cache: dict = {}
     seeds = []
     for i, hunk in enumerate(hunks):
@@ -195,7 +216,7 @@ def build_seeds(
                 hunk,
                 repo_path=repo_path,
                 repo_name=repo_name,
-                from_ref=from_ref,
+                base_ref=base,
                 to_ref=to_ref,
                 to_commit=to_commit,
                 allow_lookup=i < max_lookups,

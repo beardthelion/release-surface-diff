@@ -14,16 +14,17 @@ import (
 
 func newPkgCtx(fset *token.FileSet, root, name, pkgPath string) *pkgCtx {
 	return &pkgCtx{
-		fset:    fset,
-		root:    root,
-		name:    name,
-		pkgPath: pkgPath,
-		imports: map[*ast.File]map[string]string{},
-		consts:  map[string]string{},
-		funcs:   map[string]*ast.FuncDecl{},
-		methods: map[string][]*methodDecl{},
-		types:   map[string]*ast.TypeSpec{},
-		structs: map[string]*ast.StructType{},
+		fset:       fset,
+		root:       root,
+		name:       name,
+		pkgPath:    pkgPath,
+		imports:    map[*ast.File]map[string]string{},
+		consts:     map[string]string{},
+		funcs:      map[string]*ast.FuncDecl{},
+		methods:    map[string][]*methodDecl{},
+		types:      map[string]*ast.TypeSpec{},
+		structs:    map[string]*ast.StructType{},
+		routerVars: map[string]bool{},
 	}
 }
 
@@ -108,6 +109,16 @@ func (p *pkgCtx) indexGenDecl(d *ast.GenDecl) {
 			if len(s.Names) == 1 && len(s.Values) == 1 {
 				if lit, ok := stringLit(s.Values[0]); ok {
 					p.consts[s.Names[0].Name] = lit
+				}
+			}
+			// `var x = chi.NewRouter()` marks a package router whose
+			// registrations follow wherever it is mounted.
+			for i, name := range s.Names {
+				if i < len(s.Values) {
+					if call, ok := s.Values[i].(*ast.CallExpr); ok &&
+						isRouterCtorCall(call) {
+						p.routerVars[name.Name] = true
+					}
 				}
 			}
 		}

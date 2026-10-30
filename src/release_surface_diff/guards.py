@@ -21,7 +21,7 @@ from pathlib import Path
 
 from ._util import canonical_json, utc_now, write_text
 from .config import PathMatcher
-from .records import SymbolSpan
+from .records import EXT_LANG, SymbolSpan
 
 CLASSES = ("bounds", "auth", "allowlist", "overflow", "path", "dispatch", "other")
 
@@ -260,8 +260,28 @@ def parse_diff(diff_text: str) -> list[_FileDiff]:
 # ---- classification ----
 
 
+# A +/- line whose payload is only a comment carries no guard change:
+# skip it for class, direction, and evidence. Covers //, #, /* and block
+# continuation (*), <!-- -->, and SQL/Lua -- comment openers.
+_COMMENT_PREFIXES = ("//", "#", "/*", "*", "<!--", "--")
+
+
+def _is_comment(content: str) -> bool:
+    return content.lstrip().startswith(_COMMENT_PREFIXES)
+
+
 def _line_classes(content: str) -> list[str]:
     return [cls for cls, pat in CLASS_PATTERNS if pat.search(content)]
+
+
+def _lang_ok(path: str, langs) -> bool:
+    """Whether a file is in scope for `langs` via EXT_LANG. Files with no
+    extension or an unmapped one stay in scope (coverage is not dropped
+    silently); only a file mapped to a different lang is skipped."""
+    if not langs:
+        return True
+    lang = EXT_LANG.get(Path(path).suffix.lower())
+    return lang is None or lang in langs
 
 
 def _span_index(symbols) -> dict[str, list[SymbolSpan]]:
@@ -295,6 +315,7 @@ def classify_diff(
     matcher: "PathMatcher | None" = None,
     symbols=None,
     symbols_from=None,
+    langs=None,
 ) -> list[GuardHunk]:
     """Parse diff_text and return security-relevant hunks, in diff order.
 
@@ -303,7 +324,9 @@ def classify_diff(
     for added and modified hunks; `symbols_from` is the from-side table,
     preferred for removed hunks so a renamed function does not attribute
     to a stale name. Without either, the `@@` context string is the
-    enclosing-symbol fallback.
+    enclosing-symbol fallback. When `langs` is given, files whose
+    extension maps to a different language via EXT_LANG are skipped;
+    unmapped extensions stay in scope.
     """
     matcher = matcher or PathMatcher()
     index = _span_index(symbols)
@@ -316,9 +339,14 @@ def classify_diff(
         path = f.new_path if f.new_path is not None else f.old_path
         if path is None or not matcher.matches(path):
             continue
+        if not _lang_ok(path, langs):
+            continue
         old_path = f.old_path if f.old_path is not None else path
         for hunk in f.hunks:
-            matched = [(s, c, _line_classes(c)) for s, c in hunk.lines]
+            matched = [
+                (s, c, _line_classes(c)) for s, c in hunk.lines
+                if not _is_comment(c)
+            ]
             matched = [(s, c, cs) for s, c, cs in matched if cs]
             if not matched:
                 continue

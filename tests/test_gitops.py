@@ -151,6 +151,23 @@ def test_open_repo_file_url_clone(tagged_repo: Path, tmp_path: Path) -> None:
     assert not repo.path.exists()
 
 
+def test_open_repo_local_clone_keeps_real_origin(tagged_repo: Path) -> None:
+    """A local source repo with remote.origin.url (e.g. a blob:none
+    clone) yields a clone whose origin is that remote, so promisor
+    fetches for missing blobs do not dead-end on file://."""
+    git(tagged_repo, "remote", "add", "origin",
+        "https://example.com/owner/repo.git")
+    with gitops.open_repo(tagged_repo) as repo:
+        assert (
+            gitops.origin_url(repo.path)
+            == "https://example.com/owner/repo.git"
+        )
+    # no remote on the source: the clone's origin stays the file:// URL
+    git(tagged_repo, "remote", "remove", "origin")
+    with gitops.open_repo(tagged_repo) as repo:
+        assert gitops.origin_url(repo.path) == f"file://{tagged_repo.resolve()}"
+
+
 # ---- CLI wiring ----
 
 

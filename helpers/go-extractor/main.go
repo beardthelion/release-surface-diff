@@ -72,13 +72,14 @@ type pkgCtx struct {
 	pkgPath string // import path when known, "" otherwise
 	files   []*ast.File
 
-	imports  map[*ast.File]map[string]string // file -> alias -> import path
-	consts   map[string]string               // package-level string consts/vars
-	funcs    map[string]*ast.FuncDecl        // free functions by name
-	methods  map[string][]*methodDecl        // method name -> declarations
-	types    map[string]*ast.TypeSpec
-	structs  map[string]*ast.StructType
-	internal bool // under an internal/ path element
+	imports    map[*ast.File]map[string]string // file -> alias -> import path
+	consts     map[string]string               // package-level string consts/vars
+	funcs      map[string]*ast.FuncDecl        // free functions by name
+	methods    map[string][]*methodDecl        // method name -> declarations
+	types      map[string]*ast.TypeSpec
+	structs    map[string]*ast.StructType
+	routerVars map[string]bool // package vars bound to a router constructor
+	internal   bool            // under an internal/ path element
 }
 
 type methodDecl struct {
@@ -357,9 +358,16 @@ func loadTree(root string) []*pkgCtx {
 // extract runs every pass over every package and merges the results.
 func extract(pkgs []*pkgCtx) (records []record, spans []symbolSpan, edges []callEdge) {
 	seen := map[string]bool{}
+	// Route bindings collect across the whole module first: a router
+	// mounted or field-assigned in one package (coderd) feeds route
+	// scopes in another (enterprise/coderd).
+	routeIdx := newRouteIndex()
 	for _, p := range pkgs {
 		p.index()
-		for _, r := range extractRoutes(p) {
+		routeIdx.merge(collectRouteBindings(p))
+	}
+	for _, p := range pkgs {
+		for _, r := range extractRoutesIdx(p, routeIdx) {
 			appendUnique(&records, seen, r)
 		}
 		for _, r := range extractRPC(p) {
