@@ -102,13 +102,16 @@ def seed_for_hunk(
         sha = _introducing_commit(repo_path, ref, path, start, end, timeout)
     if sha is None:
         sha = to_commit
+    files = [hunk.file]
+    if hunk.direction == "removed" and hunk.old_file not in files:
+        files.append(hunk.old_file)
     return {
         "repo": repo_name,
         "sha": sha,
         "parent": _first_parent(repo_path, sha, parent_cache),
         "source": SOURCE,
         "class": hunk.hunk_class,
-        "files": [hunk.file],
+        "files": files,
         "symbol": hunk.symbol,
         "evidence": hunk.evidence,
     }

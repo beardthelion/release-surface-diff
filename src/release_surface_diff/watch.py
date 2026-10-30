@@ -81,18 +81,46 @@ def _write_state(path, state) -> None:
         raise
 
 
-def _pending_pairs(repo_path, last_tag) -> list[tuple[str, str]]:
+def _tag_names(repo_arg: str) -> list[str]:
+    """Tag names without cloning: `ls-remote --tags` for URLs, `tag
+    --list` for local paths."""
+    if not gitops.is_url(repo_arg):
+        return gitops.list_tags(repo_arg)
+    gitops._check_url(repo_arg)
+    names = []
+    for line in gitops.run_git(
+        None, "ls-remote", "--tags", repo_arg
+    ).splitlines():
+        ref = line.partition("\t")[2].strip()
+        if ref.startswith("refs/tags/") and not ref.endswith("^{}"):
+            names.append(ref[len("refs/tags/"):])
+    return names
+
+
+def _release_tags(names) -> list[str]:
+    """gitops.release_tags ordering over an already-collected name list."""
+    parsed = []
+    for tag in names:
+        key = gitops.parse_tag(tag)
+        if key is None:
+            _note(f"skipping unparseable tag: {tag}")
+        else:
+            parsed.append((key, tag))
+    parsed.sort(key=lambda item: item[0])
+    return [tag for key, tag in parsed if key[3] == 1]
+
+
+def _pending_pairs(tags, last_tag) -> list[tuple[str, str]]:
     """(from, to) tag pairs to run for one target, oldest new tag first.
 
-    Release tags only, pre-releases excluded exactly as in --latest. With
-    no usable last_tag only the newest pair is pending: the first check
-    diffs the latest release, it does not replay history. Otherwise every
-    tag newer than last_tag pairs with the tag that precedes it in semver
-    order.
+    `tags` is the release-sorted list from _release_tags (pre-releases
+    excluded exactly as in --latest). With no usable last_tag only the
+    newest pair is pending: the first check diffs the latest release, it
+    does not replay history. Otherwise every tag newer than last_tag
+    pairs with the tag that precedes it in semver order.
     """
-    tags = gitops.release_tags(repo_path)
     if len(tags) < 2:
-        raise gitops.GitError(f"fewer than two release tags in {repo_path}")
+        raise gitops.GitError("fewer than two release tags")
     last_key = gitops.parse_tag(str(last_tag)) if last_tag else None
     if last_tag and last_key is None:
         _note(
@@ -131,8 +159,23 @@ def _check_target(target, entry, runner, default_out) -> bool:
     include = tuple(target.get("include") or ())
     exclude = target.get("exclude")
     out = target.get("out") or default_out
+    names = _tag_names(repo_arg)
+    last_tag = entry.get("last_tag")
+    if last_tag and str(last_tag) not in names:
+        _note(
+            f"watch: {repo_arg}: recorded last_tag {last_tag!r} is not a "
+            "tag in the repo; treating this as a first run"
+        )
+        entry.pop("last_tag", None)
+        last_tag = None
+    pending = _pending_pairs(_release_tags(names), last_tag)
+    pending = pending[: target.get("max_pairs", 10)]
+    if not pending:
+        _note(f"watch: {repo_arg}: no new release tags; skipping clone")
+        return failed
+    entry["last_checked"] = utc_now()
     with gitops.open_repo(repo_arg) as repo:
-        for from_tag, to_tag in _pending_pairs(repo.path, entry.get("last_tag")):
+        for from_tag, to_tag in pending:
             try:
                 code, degraded = runner(
                     repo_arg, repo.path, from_tag, to_tag,
@@ -163,12 +206,12 @@ def check(config_path, *, runner=None) -> int:
     targets, options = config.load_watch_config(config_path)
     state_path = _state_path(config_path, options)
     state = _load_state(state_path)
+    loaded = {k: dict(v) for k, v in state.items()}
     default_out = options.get("out") or "out"
     failed = False
     for target in targets:
         key = str(target["repo"])
         entry = dict(state.get(key) or {})
-        entry["last_checked"] = utc_now()
         try:
             if _check_target(target, entry, runner, default_out):
                 failed = True
@@ -178,12 +221,14 @@ def check(config_path, *, runner=None) -> int:
             _note(f"watch: {key}: {exc}")
             entry["last_run_exit"] = 2
             failed = True
-        entry.setdefault("last_run_exit", 0)
-        entry.setdefault("degraded", False)
-        state[key] = entry
-    try:
-        _write_state(state_path, state)
-    except OSError as exc:
-        _note(f"watch: could not write state file {state_path}: {exc}")
-        return 2
+        if entry != (state.get(key) or {}):
+            entry.setdefault("last_run_exit", 0)
+            entry.setdefault("degraded", False)
+            state[key] = entry
+    if state != loaded:
+        try:
+            _write_state(state_path, state)
+        except OSError as exc:
+            _note(f"watch: could not write state file {state_path}: {exc}")
+            return 2
     return 2 if failed else 0

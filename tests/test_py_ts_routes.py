@@ -51,6 +51,8 @@ class TestPythonRoutes:
             "ANY /old/{slug}",      # re_path (?P<slug>...) -> {slug}
             "ANY /classes/{name}",  # Django <slug:name> -> {name}
         } <= ids
+        assert "ANY /v1" not in ids  # path("v1/", include(...)) is a mount
+        assert len(ids) == len(res.records)  # no duplicate emissions
 
     def test_paramless_route_emits_record(self):
         """The acl-guard-audit blind spot: a sink-free paramless handler
@@ -118,6 +120,8 @@ class TestTsRoutes:
             "POST /users/{id}",
             "ANY /api/legacy",        # pages/api file convention
         } <= ids
+        assert "ANY /api" not in ids  # app.use("/api", api) is a mount
+        assert len(ids) == len(res.records)  # no duplicate emissions
 
     def test_ts_paramless_and_methods(self):
         res = py_ts_routes.extract(TS_BASIC)

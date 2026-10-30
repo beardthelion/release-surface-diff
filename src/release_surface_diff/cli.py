@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from . import config, diff, extract, gitops, guards, rank, report, seeds
+from ._util import utc_now
 from .records import record_sort_key
 
 EXIT_NO_DELTA = 0
@@ -156,6 +157,7 @@ def run_pair(
     matcher = _matcher(include, exclude)
     tools = tools or extract.ToolPaths()
     slug = gitops.repo_slug(repo_arg)
+    generated_at = utc_now()
     diff_text = gitops.git_diff(repo_path, from_tag, to_tag)
     with gitops.worktrees(repo_path, [from_tag, to_tag]) as wts:
         langs = langs or config.detect_languages(wts[to_tag])
@@ -193,6 +195,7 @@ def run_pair(
         surface = diff.diff_snapshots(
             snap_from, snap_to,
             repo=slug, from_ref=from_tag, to_ref=to_tag,
+            generated_at=generated_at,
         )
         edges = result_from.edges + result_to.edges
     hunks = guards.classify_diff(
@@ -204,9 +207,9 @@ def run_pair(
         repo_path, repo_arg, hunks, from_tag, to_tag
     )
     guards_doc = guards.guards_json(
-        hunks, repo=slug, from_ref=from_tag, to_ref=to_tag
+        hunks, repo=slug, from_ref=from_tag, to_ref=to_tag,
+        generated_at=generated_at,
     )
-    generated_at = surface["generated_at"]
     gap_notes = result_from.gap_notes + result_to.gap_notes
     report_text = report.build_report(
         surface, ranked, gap_notes,

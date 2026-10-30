@@ -149,6 +149,16 @@ def load_watch_config(path) -> tuple[list[dict], dict]:
                     f"targets file {path}: target #{i + 1} '{key}' "
                     "must be a list of strings"
                 )
+        max_pairs = target.get("max_pairs")
+        if max_pairs is not None and (
+            isinstance(max_pairs, bool)
+            or not isinstance(max_pairs, int)
+            or max_pairs <= 0
+        ):
+            raise ConfigError(
+                f"targets file {path}: target #{i + 1} 'max_pairs' "
+                "must be a positive integer"
+            )
     options = {k: v for k, v in data.items() if k != "target"}
     return targets, options
 

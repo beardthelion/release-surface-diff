@@ -34,6 +34,7 @@ from pathlib import Path
 from ..adapters import AdapterResult
 from ..config import PathMatcher
 from ..records import Record, SymbolSpan, route_id
+from . import iter_files
 
 EXTRACTOR = "py-ts-routes"
 
@@ -202,7 +203,24 @@ def _module_of(node, imports: dict) -> str:
     return ""
 
 
-def _build_prefix_index(root: Path, matcher: PathMatcher) -> dict:
+def _py_trees(root: Path, matcher: PathMatcher, result: AdapterResult) -> dict:
+    """rel -> parsed ast for each in-scope .py file, parsed once for both
+    the prefix-index and route passes."""
+    def warn(rel, exc):
+        result.warnings.append(f"{EXTRACTOR}: unreadable file {rel}: {exc}")
+
+    trees = {}
+    for rel, text in iter_files(root, (_PY_EXT,), matcher, warn):
+        try:
+            trees[rel] = ast.parse(text)
+        except (SyntaxError, ValueError) as exc:
+            result.warnings.append(
+                f"{EXTRACTOR}: skipped unparseable file {rel}: {exc}"
+            )
+    return trees
+
+
+def _build_prefix_index(root: Path, trees: dict) -> dict:
     """rel path -> literal route prefix, best-effort.
 
     Mirrors ``acl_guard_audit/routes.py::build_prefix_index``: same-file
@@ -214,16 +232,7 @@ def _build_prefix_index(root: Path, matcher: PathMatcher) -> dict:
     """
     index: dict[str, str] = {}
     mounts: list[tuple[str, str]] = []
-    for py in sorted(root.rglob("*" + _PY_EXT)):
-        if py.is_symlink():
-            continue
-        rel = py.relative_to(root).as_posix()
-        if not matcher.matches(rel):
-            continue
-        try:
-            tree = ast.parse(py.read_text(encoding="utf-8", errors="replace"))
-        except (SyntaxError, ValueError, OSError):
-            continue
+    for rel, tree in trees.items():
         imports: dict[str, str] = {}
         own_prefix = ""
         var_prefixes: dict[str, str] = {}
@@ -315,10 +324,9 @@ def _build_prefix_index(root: Path, matcher: PathMatcher) -> dict:
                 break
             mod_dir = root / relpath
             if mod_dir.is_dir():
-                for f in sorted(mod_dir.rglob("*.py")):
-                    if f.is_symlink():
+                for crelp in sorted(trees):
+                    if not crelp.startswith(relpath + "/"):
                         continue
-                    crelp = f.relative_to(root).as_posix()
                     if crelp in mounted:
                         continue
                     index[crelp] = join_prefix(p, index.get(crelp, "/"))
@@ -448,23 +456,9 @@ def _py_call_routes(result, rel, node, prefix, parents):
 
 
 def _extract_python(root: Path, matcher: PathMatcher, result: AdapterResult):
-    prefixes = _build_prefix_index(root, matcher)
-    for py in sorted(root.rglob("*" + _PY_EXT)):
-        if py.is_symlink():
-            continue
-        rel = py.relative_to(root).as_posix()
-        if not matcher.matches(rel):
-            continue
-        try:
-            tree = ast.parse(py.read_text(encoding="utf-8", errors="replace"))
-        except (SyntaxError, ValueError) as exc:
-            result.warnings.append(
-                f"{EXTRACTOR}: skipped unparseable file {rel}: {exc}"
-            )
-            continue
-        except OSError as exc:
-            result.warnings.append(f"{EXTRACTOR}: unreadable file {rel}: {exc}")
-            continue
+    trees = _py_trees(root, matcher, result)
+    prefixes = _build_prefix_index(root, trees)
+    for rel, tree in trees.items():
         prefix = prefixes.get(rel, "")
         parents: dict[int, ast.AST] = {}
         for node in ast.walk(tree):
@@ -765,17 +759,10 @@ def _extract_ts_file(rel: str, text: str, result: AdapterResult):
 
 
 def _extract_ts(root: Path, matcher: PathMatcher, result: AdapterResult):
-    for f in sorted(root.rglob("*")):
-        if f.is_symlink() or f.suffix not in _TS_EXTS or not f.is_file():
-            continue
-        rel = f.relative_to(root).as_posix()
-        if not matcher.matches(rel):
-            continue
-        try:
-            text = f.read_text(encoding="utf-8", errors="replace")
-        except OSError as exc:
-            result.warnings.append(f"{EXTRACTOR}: unreadable file {rel}: {exc}")
-            continue
+    def warn(rel, exc):
+        result.warnings.append(f"{EXTRACTOR}: unreadable file {rel}: {exc}")
+
+    for rel, text in iter_files(root, _TS_EXTS, matcher, warn):
         _extract_ts_file(rel, text, result)
 
 

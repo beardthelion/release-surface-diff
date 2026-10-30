@@ -20,6 +20,7 @@ from pathlib import Path
 from ..adapters import AdapterResult
 from ..config import PathMatcher
 from ..records import EXT_LANG, Record
+from . import iter_files
 
 EXTRACTOR = "protocol-ids"
 
@@ -98,7 +99,7 @@ def _symbols_by_line(lines: list[str], lang: str) -> list[tuple[int, str]]:
 
 def _extract_file(rel: str, text: str, lang: str, result: AdapterResult):
     lines = text.splitlines()
-    defs = _symbols_by_line(lines, lang)
+    defs = None
     seen: set[tuple[str, str]] = set()
     for lineno, line in enumerate(lines, start=1):
         for m in _STRING_RE.finditer(line):
@@ -108,6 +109,8 @@ def _extract_file(rel: str, text: str, lang: str, result: AdapterResult):
             if (rel, lit) in seen:
                 continue
             seen.add((rel, lit))
+            if defs is None:
+                defs = _symbols_by_line(lines, lang)
             symbol = ""
             for def_line, name in defs:
                 if def_line <= lineno:
@@ -133,19 +136,10 @@ def extract(root, matcher=None) -> AdapterResult:
     result = AdapterResult()
     root = Path(root)
     matcher = matcher or PathMatcher()
-    for f in sorted(root.rglob("*")):
-        if f.is_symlink() or not f.is_file():
-            continue
-        lang = EXT_LANG.get(f.suffix.lower())
-        if lang is None:
-            continue
-        rel = f.relative_to(root).as_posix()
-        if not matcher.matches(rel):
-            continue
-        try:
-            text = f.read_text(encoding="utf-8", errors="replace")
-        except OSError as exc:
-            result.warnings.append(f"{EXTRACTOR}: unreadable file {rel}: {exc}")
-            continue
-        _extract_file(rel, text, lang, result)
+
+    def warn(rel, exc):
+        result.warnings.append(f"{EXTRACTOR}: unreadable file {rel}: {exc}")
+
+    for rel, text in iter_files(root, EXT_LANG, matcher, warn):
+        _extract_file(rel, text, EXT_LANG[Path(rel).suffix.lower()], result)
     return result

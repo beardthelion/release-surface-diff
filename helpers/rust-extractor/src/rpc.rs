@@ -10,8 +10,8 @@ use syn::{Expr, File};
 use crate::model::{attrs, Extraction, Record};
 use crate::symbols::type_name;
 use crate::util::{
-    assign_parts, attr_exprs, attr_name, expr_path, expr_render, lit_str, path_string,
-    path_tail, start_line, Scope,
+    assign_parts, attr_exprs, attr_name, expr_path, expr_render, lit_str, path_tail,
+    start_line, Scope,
 };
 
 pub fn extract(file: &File, path: &str, out: &mut Extraction) {
