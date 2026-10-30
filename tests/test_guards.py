@@ -442,3 +442,71 @@ def test_removed_hunk_seed_attributes_to_remover(tmp_path) -> None:
     out = seeds_mod.build_seeds(repo, str(repo), [hunk], "v1.0.0", "v1.1.0")
     assert out[0]["sha"] == c3
     assert out[0]["parent"] == c2
+
+
+def _seed_repo(tmp_path, extra=None):
+    """c1 guard at lines 10-11 (v1.0.0); c2 removes it; c3 touches the same
+    file post-removal (optionally shifting content); c4 touches another file
+    (v1.1.0)."""
+    import subprocess
+    repo = tmp_path / "repo"; repo.mkdir()
+    def git(*a):
+        return subprocess.run(["git", "-C", str(repo), *a],
+                              capture_output=True, text=True, check=True).stdout
+    git("init", "-q"); git("config", "user.email", "t@t"); git("config", "user.name", "t")
+    body = [f"line{i}" for i in range(1, 10)] + ["check_perm(u)", "len(b) > max_"] + [f"line{i}" for i in range(12, 15)]
+    (repo / "x.py").write_text("\n".join(body) + "\n")
+    git("add", "x.py"); git("commit", "-qm", "c1"); c1 = git("rev-parse", "HEAD").strip()
+    git("tag", "v1.0.0")
+    (repo / "x.py").write_text("\n".join(body[:9] + body[11:]) + "\n")
+    git("add", "x.py"); git("commit", "-qm", "c2"); c2 = git("rev-parse", "HEAD").strip()
+    (repo / "x.py").write_text("\n".join(extra(body) if extra else body[:9] + body[11:13] + ["edited"] + body[13:]) + "\n")
+    git("add", "x.py"); git("commit", "-qm", "c3"); c3 = git("rev-parse", "HEAD").strip()
+    (repo / "y.py").write_text("other\n")
+    git("add", "y.py"); git("commit", "-qm", "c4"); c4 = git("rev-parse", "HEAD").strip()
+    git("tag", "v1.1.0")
+    hunk = guards.GuardHunk(
+        file="x.py", old_file="x.py", old_start=10, old_count=2,
+        new_start=10, new_count=0, hunk_class="auth", direction="removed",
+        symbol=None, evidence="-check_perm(u)")
+    return repo, git, c1, c2, c3, c4, hunk
+
+
+def test_removed_seed_attributes_to_remover_not_to_toucher(tmp_path) -> None:
+    """The repro: -L at the tip would hit c3's unrelated edit at old line 11;
+    reverse-blame attribution must land on c2."""
+    from release_surface_diff import seeds as seeds_mod
+    repo, _git, c1, c2, c3, c4, hunk = _seed_repo(tmp_path)
+    [seed] = seeds_mod.build_seeds(repo, str(repo), [hunk], "v1.0.0", "v1.1.0")
+    assert seed["sha"] == c2
+    assert seed["parent"] == c1
+    assert "attribution" not in seed
+
+
+def test_removed_seed_with_shifting_lines_after_removal(tmp_path) -> None:
+    """c3 inserts lines above the old guard position; attribution must still
+    land on c2 via the from-side range, not the shifted to-side lines."""
+    from release_surface_diff import seeds as seeds_mod
+    def shift(body):
+        return ["new0", "new1", "new2"] + body[:9] + body[11:13] + ["edited"] + body[13:]
+    repo, _git, c1, c2, c3, c4, hunk = _seed_repo(tmp_path, extra=shift)
+    [seed] = seeds_mod.build_seeds(repo, str(repo), [hunk], "v1.0.0", "v1.1.0")
+    assert seed["sha"] == c2
+    assert seed["parent"] == c1
+
+
+def test_seed_repo_uses_origin_owner_name(tmp_path) -> None:
+    """Local --repo with an origin remote yields owner/name, not basename."""
+    from release_surface_diff import seeds as seeds_mod
+    repo, git, c1, c2, c3, c4, hunk = _seed_repo(tmp_path)
+    git("remote", "add", "origin", "https://github.com/coder/coder.git")
+    [seed] = seeds_mod.build_seeds(repo, str(repo), [hunk], "v1.0.0", "v1.1.0")
+    assert seed["repo"] == "coder/coder"
+
+
+def test_seed_repo_falls_back_to_dirname(tmp_path) -> None:
+    """No remote: dir name is used, never an empty string."""
+    from release_surface_diff import seeds as seeds_mod
+    repo, git, c1, c2, c3, c4, hunk = _seed_repo(tmp_path)
+    [seed] = seeds_mod.build_seeds(repo, str(repo), [hunk], "v1.0.0", "v1.1.0")
+    assert seed["repo"] == "repo"

@@ -363,6 +363,42 @@ def git_diff(repo, from_ref: str, to_ref: str, context: int = 5) -> str:
     )
 
 
+def blame_reverse(
+    repo, from_ref: str, to_ref: str, path: str, start: int, end: int,
+    *, timeout=None,
+) -> str:
+    """`git blame --reverse from..to` over the from-side line range.
+
+    Reverse blame attributes each line to the last commit in the range where
+    it still existed; the child of that commit on the first-parent path is
+    the commit that removed it.
+    """
+    return run_git(
+        repo, "blame", "--porcelain", "--reverse", f"{from_ref}..{to_ref}",
+        "-L", f"{start},{end}", "--", path, timeout=timeout,
+    )
+
+
+def first_parent_chain(repo, from_ref: str, to_ref: str, *, timeout=None) -> list[str]:
+    """Oldest-first shas on the first-parent path within from..to."""
+    out = run_git(
+        repo, "rev-list", "--first-parent", "--reverse",
+        f"{from_ref}..{to_ref}", timeout=timeout,
+    )
+    return out.split()
+
+
+def origin_url(repo, *, timeout=None) -> "str | None":
+    """The repo's remote.origin.url, or None when unset/unresolvable."""
+    try:
+        out = run_git(
+            repo, "config", "--get", "remote.origin.url", timeout=timeout,
+        ).strip()
+    except GitError:
+        return None
+    return out or None
+
+
 def log_line_history(
     repo, ref: str, path: str, start: int, end: int,
     *, first_only: bool = True, timeout=None,

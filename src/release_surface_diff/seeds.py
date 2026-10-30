@@ -43,9 +43,10 @@ def _hunk_lookup(hunk: GuardHunk, from_ref: str, to_ref: str):
     to tag, so history must be traced where they still lived (KTD10). Added
     and modified hunks resolve on the to side, where the lines were written.
     """
-    # Bound the walk to from..to so the newest touching commit is the one
-    # that produced the diff hunk: for a removed line that is the removing
-    # commit, not the commit that originally added the line (spec R15).
+    # Added/modified lines resolve on the to side: `log -L` interprets the
+    # range at the tip, which is where those lines live. Removed lines are
+    # gone at the tip, so to-side numbers are meaningless there; they go
+    # through `_removing_commit` instead (spec R15).
     rev = f"{from_ref}..{to_ref}"
     if hunk.direction == "removed":
         end = hunk.old_start + hunk.old_count - 1
@@ -67,6 +68,35 @@ def _introducing_commit(repo, ref: str, path: str, start: int, end: int,
         return None
     m = _COMMIT_RE.search(out)
     return m.group(1) if m else None
+
+
+_BLAME_SHA_RE = re.compile(r"^\^?([0-9a-f]{40})\b", re.MULTILINE)
+
+
+def _removing_commit(repo, from_ref: str, to_ref: str, path: str,
+                     start: int, end: int, timeout) -> "str | None":
+    """The first-parent child, within from..to, of the last commit where the
+    removed lines still existed (reverse blame), or None when unresolvable."""
+    if start <= 0 or end < start:
+        return None
+    try:
+        blame = gitops.blame_reverse(
+            repo, from_ref, to_ref, path, start, end, timeout=timeout
+        )
+        chain = gitops.first_parent_chain(repo, from_ref, to_ref, timeout=timeout)
+        from_sha = gitops.resolve_commit(repo, from_ref)
+    except GitError:
+        return None
+    # child_on_path[sha] = sha's successor on the first-parent path, where the
+    # path begins at the from-side commit itself.
+    order = [from_sha] + chain
+    child_on_path = {s: order[i + 1] for i, s in enumerate(order)
+                     if i + 1 < len(order)}
+    for last_seen in _BLAME_SHA_RE.findall(blame):
+        child = child_on_path.get(last_seen)
+        if child:
+            return child
+    return None
 
 
 def _first_parent(repo, sha: str, cache: "dict | None" = None) -> "str | None":
@@ -103,13 +133,21 @@ def seed_for_hunk(
     sha = None
     if allow_lookup:
         ref, path, start, end = _hunk_lookup(hunk, from_ref, to_ref)
-        sha = _introducing_commit(repo_path, ref, path, start, end, timeout)
+        if hunk.direction == "removed":
+            sha = _removing_commit(
+                repo_path, from_ref, to_ref, path, start, end, timeout
+            )
+        else:
+            sha = _introducing_commit(
+                repo_path, ref, path, start, end, timeout
+            )
+    attributed = sha is not None
     if sha is None:
         sha = to_commit
     files = [hunk.file]
     if hunk.direction == "removed" and hunk.old_file not in files:
         files.append(hunk.old_file)
-    return {
+    seed = {
         "repo": repo_name,
         "sha": sha,
         "parent": _first_parent(repo_path, sha, parent_cache),
@@ -119,6 +157,10 @@ def seed_for_hunk(
         "symbol": hunk.symbol,
         "evidence": hunk.evidence,
     }
+    if not attributed:
+        # lookup failed or found nothing: the tag-commit fallback is explicit
+        seed["attribution"] = "fallback"
+    return seed
 
 
 def build_seeds(
@@ -138,6 +180,12 @@ def build_seeds(
     """
     repo_path = Path(repo_path)
     repo_name = gitops.repo_slug(repo_arg)
+    if not gitops.is_url(str(repo_arg)):
+        # repo_path may be a clone whose origin is the temp clone URL; ask the
+        # user's repo itself for the real remote (spec: owner/name).
+        origin = gitops.origin_url(repo_arg)
+        if origin:
+            repo_name = gitops.repo_slug(origin)
     to_commit = gitops.resolve_commit(repo_path, to_ref)
     parent_cache: dict = {}
     seeds = []
