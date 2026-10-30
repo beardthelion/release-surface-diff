@@ -16,14 +16,11 @@ import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from ._util import note as _note
 
 
 class GitError(RuntimeError):
     """Any git-layer failure; the CLI maps it to exit code 2."""
-
-
-def _note(msg: str) -> None:
-    print(f"release-surface-diff: {msg}", file=sys.stderr)
 
 
 def run_git(repo: Path | str | None, *args: str, timeout=None) -> str:
@@ -53,7 +50,6 @@ class Repo:
     """A usable local git repo: either the path the user gave or a clone."""
 
     path: Path
-    cloned: bool = False
 
 
 def _clone(url: str, dest: Path) -> None:
@@ -83,7 +79,7 @@ def open_repo(repo, clone_base=None):
         dest = root / "repo"
         try:
             _clone(str(repo), dest)
-            yield Repo(dest, cloned=True)
+            yield Repo(dest)
         finally:
             shutil.rmtree(root, ignore_errors=True)
     else:
@@ -91,7 +87,7 @@ def open_repo(repo, clone_base=None):
         if not path.is_dir():
             raise GitError(f"repo path does not exist: {repo}")
         run_git(path, "rev-parse", "--git-dir")
-        yield Repo(path, cloned=False)
+        yield Repo(path)
 
 
 def repo_slug(repo) -> str:

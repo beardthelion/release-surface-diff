@@ -325,7 +325,7 @@ impl<'ast> AxumCtx<'_, 'ast> {
                         ));
                     }
                 }
-                "route_service" => {
+                "route_service" | "nest_service" => {
                     let Some(tpl) = mc
                         .args
                         .first()
@@ -363,29 +363,6 @@ impl<'ast> AxumCtx<'_, 'ast> {
                             entries.push((idx, e));
                         }
                     }
-                }
-                "nest_service" => {
-                    let Some(tpl) = mc
-                        .args
-                        .first()
-                        .and_then(|a| template_str(a, self.bindings, depth))
-                    else {
-                        continue;
-                    };
-                    entries.push((
-                        idx,
-                        RouteEntry {
-                            template: canonical_template(&tpl),
-                            verb: "ANY".into(),
-                            handler: mc
-                                .args
-                                .get(1)
-                                .and_then(call_target_name)
-                                .unwrap_or_default(),
-                            hints: Vec::new(),
-                            line,
-                        },
-                    ));
                 }
                 "merge" => {
                     if let Some(arg) = mc.args.first() {

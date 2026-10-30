@@ -2,6 +2,7 @@ package main
 
 import (
 	"go/ast"
+	pathpkg "path"
 	"strings"
 )
 
@@ -126,7 +127,7 @@ func (p *pkgCtx) flagFromCall(f *ast.File, file, enclosing string,
 	switch x := sel.X.(type) {
 	case *ast.Ident:
 		if path, imported := p.importPath(f, x); imported && isFlagPkg(path) {
-			registrar = pathBase(path) // "flag" or "pflag"
+			registrar = pathpkg.Base(path) // "flag" or "pflag"
 		} else if flagVars[x.Name] {
 			registrar = "flag.FlagSet"
 		}

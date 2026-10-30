@@ -58,7 +58,11 @@ def _sources_newer(src_dir: Path, binary: Path) -> bool:
         mtime = binary.stat().st_mtime
     except OSError:
         return True
+    # Skip build output and hidden dirs: target/ alone is thousands of
+    # files on a rust helper that has been built once.
     for p in src_dir.rglob("*"):
+        if any(part.startswith(".") or part == "target" for part in p.parts):
+            continue
         if p.is_file():
             try:
                 if p.stat().st_mtime > mtime:
@@ -129,8 +133,6 @@ def resolve(lang: str, explicit=None):
 
 def _read_sidecar(path: Path):
     """JSONL sidecar -> (items, bad_count); bad_count -1 when absent."""
-    if not path.is_file():
-        return [], -1
     try:
         return parse_jsonl(path.read_text(errors="replace"))
     except OSError:
@@ -148,15 +150,17 @@ def run_helper(lang: str, root, *, explicit=None, timeout=HELPER_TIMEOUT) -> Ada
         return result.degrade(spec["binary"], why or "unavailable")
     if why:  # stale-binary fallback warning
         result.warnings.append(f"{spec['binary']}: {why}")
-    side_dir = Path(tempfile.mkdtemp(prefix=f"rsd-{lang}-helper-"))
-    sym_path = side_dir / "symbols.jsonl"
-    edge_path = side_dir / "edges.jsonl"
-    proc, err = run_tool(
-        [binary, str(root), "--symbols", str(sym_path), "--edges", str(edge_path)],
-        timeout,
-    )
-    if err:
-        return result.degrade(spec["binary"], err)
+    with tempfile.TemporaryDirectory(prefix=f"rsd-{lang}-helper-") as side_dir:
+        sym_path = Path(side_dir) / "symbols.jsonl"
+        edge_path = Path(side_dir) / "edges.jsonl"
+        proc, err = run_tool(
+            [binary, str(root), "--symbols", str(sym_path), "--edges", str(edge_path)],
+            timeout,
+        )
+        if err:
+            return result.degrade(spec["binary"], err)
+        side_symbols, bad_sym = _read_sidecar(sym_path)
+        side_edges, bad_edge = _read_sidecar(edge_path)
     objs, bad = parse_jsonl(proc.stdout)
     for obj in objs:
         try:
@@ -180,8 +184,7 @@ def run_helper(lang: str, root, *, explicit=None, timeout=HELPER_TIMEOUT) -> Ada
             f"{spec['binary']}: exited {proc.returncode}; records may be partial"
         )
         result.flag_partial()
-    symbols, bad_sym = _read_sidecar(sym_path)
-    edges, bad_edge = _read_sidecar(edge_path)
+    symbols, edges = side_symbols, side_edges
     for s in symbols:
         result.symbols.append(
             SymbolSpan(

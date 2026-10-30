@@ -22,6 +22,7 @@ import re
 from pathlib import Path
 
 from . import gitops
+from ._util import write_text
 from .gitops import GitError
 from .guards import GuardHunk
 
@@ -64,14 +65,19 @@ def _introducing_commit(repo, ref: str, path: str, start: int, end: int,
     return m.group(1) if m else None
 
 
-def _first_parent(repo, sha: str) -> "str | None":
-    """First parent of `sha`, or None for a root commit."""
+def _first_parent(repo, sha: str, cache: "dict | None" = None) -> "str | None":
+    """First parent of `sha`, or None for a root commit; memoized per run."""
+    if cache is not None and sha in cache:
+        return cache[sha]
     try:
-        return gitops.run_git(
+        parent = gitops.run_git(
             repo, "rev-parse", "--verify", "--quiet", f"{sha}^"
         ).strip() or None
     except GitError:
-        return None
+        parent = None
+    if cache is not None:
+        cache[sha] = parent
+    return parent
 
 
 def seed_for_hunk(
@@ -84,6 +90,7 @@ def seed_for_hunk(
     to_commit: "str | None" = None,
     allow_lookup: bool = True,
     timeout=LOG_L_TIMEOUT,
+    parent_cache: "dict | None" = None,
 ) -> dict:
     """One seeds.jsonl record for a classified hunk."""
     repo_path = Path(repo_path)
@@ -98,7 +105,7 @@ def seed_for_hunk(
     return {
         "repo": repo_name,
         "sha": sha,
-        "parent": _first_parent(repo_path, sha),
+        "parent": _first_parent(repo_path, sha, parent_cache),
         "source": SOURCE,
         "class": hunk.hunk_class,
         "files": [hunk.file],
@@ -125,6 +132,7 @@ def build_seeds(
     repo_path = Path(repo_path)
     repo_name = gitops.repo_slug(repo_arg)
     to_commit = gitops.resolve_commit(repo_path, to_ref)
+    parent_cache: dict = {}
     seeds = []
     for i, hunk in enumerate(hunks):
         seeds.append(
@@ -137,6 +145,7 @@ def build_seeds(
                 to_commit=to_commit,
                 allow_lookup=i < max_lookups,
                 timeout=timeout,
+                parent_cache=parent_cache,
             )
         )
     return seeds
@@ -149,7 +158,4 @@ def seeds_jsonl_text(seeds: list[dict]) -> str:
 
 def write_seeds_jsonl(seeds: list[dict], path: "str | Path") -> Path:
     """Write seeds.jsonl, creating the output directory if needed."""
-    out = Path(path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(seeds_jsonl_text(seeds), encoding="utf-8")
-    return out
+    return write_text(path, seeds_jsonl_text(seeds))

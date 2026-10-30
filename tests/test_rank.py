@@ -23,8 +23,6 @@ def hunk(symbol="", cls="bounds", direction="removed", file="a.go", start=10):
         direction=direction,
         symbol=symbol,
         evidence="- if len(b) > max {",
-        context=None,
-        changed=[("-", "if len(b) > max {")],
     )
 
 

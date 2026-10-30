@@ -19,6 +19,18 @@ KINDS = ("route", "rpc", "cli_flag", "config_key", "export", "outbound", "protoc
 # Canonical lang tokens; JS variants fold into ts (KTD5).
 LANGS = ("go", "rust", "python", "ts")
 
+EXT_LANG = {
+    ".go": "go",
+    ".rs": "rust",
+    ".py": "python",
+    ".ts": "ts",
+    ".tsx": "ts",
+    ".js": "ts",
+    ".jsx": "ts",
+    ".mjs": "ts",
+    ".cjs": "ts",
+}
+
 _LANG_ALIASES = {
     "go": "go",
     "golang": "go",

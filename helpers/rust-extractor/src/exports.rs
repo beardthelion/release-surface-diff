@@ -229,7 +229,7 @@ impl<'ast> Visit<'ast> for ExpVisit<'ast> {
         }
         if let Some(ty) = type_name(&i.self_ty) {
             let ty_q = self.scope.qualify(&ty);
-            // inherent impl methods are exported only when the type is
+            // inherent impl methods are exported only when the type is itself exported
             if self.exported.contains(&ty_q) {
                 for it in &i.items {
                     if let syn::ImplItem::Fn(f) = it {

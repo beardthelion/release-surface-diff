@@ -12,8 +12,7 @@ def hunk(symbol="", cls="bounds", direction="removed", file="srv/api.go",
     return GuardHunk(
         file=file, old_file=file, old_start=40, old_count=6,
         new_start=40, new_count=6, hunk_class=cls, direction=direction,
-        symbol=symbol, evidence=evidence, context=None,
-        changed=[("-", evidence.lstrip("-+ "))],
+        symbol=symbol, evidence=evidence,
     )
 
 

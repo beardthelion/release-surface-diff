@@ -10,7 +10,7 @@ incomplete analysis, so parseable stdout is consumed regardless (KTD3).
 
 from pathlib import Path
 
-from ..records import Record, route_id
+from ..records import EXT_LANG, Record, route_id
 from . import DEFAULT_TIMEOUT, AdapterResult, parse_stdout_json, run_tool
 
 TOOL_NAME = "acl-guard-audit"
@@ -19,17 +19,6 @@ SCHEMA_VERSION = "acl-guard-audit/v1"
 SCAN_TIMEOUT = DEFAULT_TIMEOUT
 
 _SITE_BUCKETS = ("findings", "recognized_complete", "candidates")
-
-_EXT_LANG = {
-    ".py": "python",
-    ".ts": "ts",
-    ".tsx": "ts",
-    ".js": "ts",
-    ".jsx": "ts",
-    ".mjs": "ts",
-    ".cjs": "ts",
-}
-
 
 def _extractor_name(data: dict) -> str:
     version = data.get("ruleset_version")
@@ -54,7 +43,7 @@ def _site_record(site, extractor: str):
             f"{TOOL_NAME}: site {site.get('site_id', '?')} at {path} has no "
             f"route; handler {site.get('function', '?')} not inventoried"
         )
-    lang = _EXT_LANG.get(Path(path).suffix.lower())
+    lang = EXT_LANG.get(Path(path).suffix.lower())
     if lang is None:
         return None, (
             f"{TOOL_NAME}: site {site.get('site_id', '?')} at {path} has an "

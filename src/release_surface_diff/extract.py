@@ -57,55 +57,44 @@ def find_tool(binary: str, explicit=None, env_var=None):
     )
 
 
-def _py_ts_routes(root: Path) -> AdapterResult:
-    """In-repo Python/TS route extractor (KD1/KTD12), landed in U5.
-
-    The call site is wired now; until the module exists the acl-guard-audit
-    blind spot (sink-free handlers, including most paramless routes) is
-    reported as a gap instead of silently accepted. U5's entry point is
-    `extractors.py_ts_routes.extract(root) -> AdapterResult | list[Record]`.
-    """
+def _optional_extractor(module_name: str, label: str, missing: str, root: Path) -> AdapterResult:
+    """Tolerate-absence wrapper for in-repo extractors: an ImportError or a
+    raised failure degrades to a gap note (R17) rather than a hard error."""
     try:
-        from .extractors import py_ts_routes
-    except ImportError:
-        return AdapterResult().degrade(
-            "py-ts-routes",
-            "in-repo Python/TS route extractor not present (lands in U5); "
-            "acl-guard-audit sees only sink-bearing handlers and id-param "
-            "candidates (KD1)",
+        module = __import__(
+            f"release_surface_diff.extractors.{module_name}", fromlist=["extract"]
         )
+    except ImportError:
+        return AdapterResult().degrade(label, missing)
     try:
-        out = py_ts_routes.extract(root)
+        out = module.extract(root)
     except Exception as exc:
-        return AdapterResult().degrade("py-ts-routes", f"extract failed: {exc}")
+        return AdapterResult().degrade(label, f"extract failed: {exc}")
     if isinstance(out, AdapterResult):
         return out
     result = AdapterResult()
     if out:
         result.records = list(out)
     return result
+
+
+def _py_ts_routes(root: Path) -> AdapterResult:
+    """In-repo Python/TS route extractor (KD1/KTD12)."""
+    return _optional_extractor(
+        "py_ts_routes", "py-ts-routes",
+        "in-repo Python/TS route extractor not present; acl-guard-audit sees "
+        "only sink-bearing handlers and id-param candidates (KD1)",
+        root,
+    )
 
 
 def _protocol_ids(root: Path) -> AdapterResult:
     """Bare-literal protocol-id pass (R10): the single producer for
-    req/resp protocol strings and gossip topic templates in every
-    language. Same tolerate-absence shape as _py_ts_routes."""
-    try:
-        from .extractors import protocol_ids
-    except ImportError:
-        return AdapterResult().degrade(
-            "protocol-ids", "in-repo protocol-id extractor not present"
-        )
-    try:
-        out = protocol_ids.extract(root)
-    except Exception as exc:
-        return AdapterResult().degrade("protocol-ids", f"extract failed: {exc}")
-    if isinstance(out, AdapterResult):
-        return out
-    result = AdapterResult()
-    if out:
-        result.records = list(out)
-    return result
+    req/resp protocol strings and gossip topic templates in every language."""
+    return _optional_extractor(
+        "protocol_ids", "protocol-ids",
+        "in-repo protocol-id extractor not present", root,
+    )
 
 
 def _dedupe_py_ts_routes(result: AdapterResult) -> None:

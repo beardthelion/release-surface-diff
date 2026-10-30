@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import adapters as _adapters
+from ._util import canonical_json, utc_now, write_text
 from .records import Record, SymbolSpan, matching_keys, record_sort_key
 
 # KTD6: bodies shorter than this are too generic to prove a rename.
@@ -25,7 +27,7 @@ RENAME_MIN_BODY_LINES = 8
 
 # Attr stamped on emitted delta records when either side was extracted
 # incompletely (missing/degraded tool, KTD3); surfaced in the report (U7).
-LOW_CONFIDENCE_ATTR = "low_confidence"
+LOW_CONFIDENCE_ATTR = _adapters.LOW_CONFIDENCE_ATTR
 
 # Middleware-chain attr whose drift marks a matched record changed (R12).
 AUTH_HINT_ATTR = "auth_hint"
@@ -182,10 +184,6 @@ def _detect_renames(
 # ---- surface.json emission (R14, R16) ----
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-
-
 def _record_dict(record: Record, low_confidence: bool) -> dict:
     data = record.to_dict()
     if low_confidence:
@@ -243,7 +241,7 @@ def diff_snapshots(
         "repo": repo,
         "from": from_ref,
         "to": to_ref,
-        "generated_at": generated_at if generated_at is not None else _utc_now(),
+        "generated_at": generated_at if generated_at is not None else utc_now(),
         "added": [_record_dict(after.records[j], low) for j in added],
         "removed": [_record_dict(before.records[i], low) for i in removed],
         "changed": [
@@ -273,12 +271,9 @@ def diff_snapshots(
 
 def surface_json_text(result: dict) -> str:
     """Canonical serialization: sorted keys, stable across runs (R16)."""
-    return json.dumps(result, indent=2, sort_keys=True) + "\n"
+    return canonical_json(result)
 
 
 def write_surface_json(result: dict, path: "str | Path") -> Path:
     """Write surface.json, creating the output directory if needed."""
-    out = Path(path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(surface_json_text(result), encoding="utf-8")
-    return out
+    return write_text(path, surface_json_text(result))

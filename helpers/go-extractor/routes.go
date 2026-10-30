@@ -26,11 +26,13 @@ var httpVerbs = map[string]string{
 	"Any": "ANY", "ANY": "ANY",
 }
 
-var verbWords = map[string]bool{
-	"GET": true, "HEAD": true, "POST": true, "PUT": true,
-	"PATCH": true, "DELETE": true, "CONNECT": true,
-	"OPTIONS": true, "TRACE": true, "ANY": true,
-}
+var verbWords = func() map[string]bool {
+	m := make(map[string]bool, len(httpVerbs))
+	for _, v := range httpVerbs {
+		m[v] = true
+	}
+	return m
+}()
 
 // gorillaChainPassthrough are mux chain builders that refine a route
 // without carrying the path or verb, so a Handler chain walk can step

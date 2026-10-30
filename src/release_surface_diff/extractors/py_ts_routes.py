@@ -126,15 +126,6 @@ def _tail(func) -> str:
     return ""
 
 
-def _func_tail(func) -> str:
-    """Alias of ``_tail`` kept for readability at call sites."""
-    if isinstance(func, ast.Attribute):
-        return func.attr
-    if isinstance(func, ast.Name):
-        return func.id
-    return ""
-
-
 def _str_val(node) -> str:
     return (
         node.value
@@ -185,7 +176,7 @@ def _callee_name(node) -> str:
     """Symbol name for a view/handler argument: name tail or class of
     ``X.as_view()``."""
     if isinstance(node, ast.Call):
-        if _func_tail(node.func) == "as_view" and isinstance(
+        if _tail(node.func) == "as_view" and isinstance(
             node.func, ast.Attribute
         ):
             tail = _dotted(node.func.value).rsplit(".", 1)[-1]
@@ -356,7 +347,7 @@ def _py_decorator_routes(result, rel, fn, dec, prefix):
     call = dec if isinstance(dec, ast.Call) else None
     if call is None or not call.args:
         return
-    tail = _func_tail(call.func).lower()
+    tail = _tail(call.func).lower()
     if tail not in HTTP_VERBS and tail not in ("route", "api_route"):
         return
     raw = _str_val(call.args[0])

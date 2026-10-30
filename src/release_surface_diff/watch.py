@@ -23,12 +23,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config, gitops
+from ._util import note as _note
 
 STATE_FILE_NAME = "state.json"
-
-
-def _note(msg: str) -> None:
-    print(f"release-surface-diff: {msg}", file=sys.stderr)
 
 
 def _now() -> str:

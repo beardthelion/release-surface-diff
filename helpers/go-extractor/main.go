@@ -115,14 +115,6 @@ func (p *pkgCtx) importPath(f *ast.File, ident *ast.Ident) (string, bool) {
 	return path, ok
 }
 
-// pathBase is the last element of an import path.
-func pathBase(path string) string {
-	if i := strings.LastIndex(path, "/"); i >= 0 {
-		return path[i+1:]
-	}
-	return path
-}
-
 // ---- tree loading -------------------------------------------------------
 
 // skipDir mirrors the default exclude spirit (KTD11): vendored trees,

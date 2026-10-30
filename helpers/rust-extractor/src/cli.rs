@@ -34,7 +34,7 @@ struct CliVisit<'a> {
 /// Long-flag name from `#[arg(...)]`/`#[clap(...)]`/`#[command(...)]`
 /// args: explicit `long = "x"` wins, bare `long` derives from the field.
 /// Returns (Some(name), _) or None when no long flag is declared.
-fn long_flag(attrs: &[syn::Attribute], field: &str) -> Option<Option<String>> {
+fn long_flag(attrs: &[syn::Attribute]) -> Option<Option<String>> {
     for a in attrs {
         if !CLAP_ATTRS.contains(&attr_name(a).as_str()) {
             continue;
@@ -43,10 +43,9 @@ fn long_flag(attrs: &[syn::Attribute], field: &str) -> Option<Option<String>> {
             for e in &exprs {
                 match e {
                     Expr::Path(p) => {
-                        if expr_path(e).and_then(path_tail).as_deref() == Some("long") {
+                        if path_tail(&p.path).as_deref() == Some("long") {
                             return Some(None);
                         }
-                        let _ = p;
                     }
                     _ => {
                         if let Some((k, v)) = assign_parts(e) {
@@ -59,7 +58,6 @@ fn long_flag(attrs: &[syn::Attribute], field: &str) -> Option<Option<String>> {
             }
         }
     }
-    let _ = field;
     None
 }
 
@@ -123,7 +121,7 @@ impl<'ast> Visit<'ast> for CliVisit<'ast> {
                 for f in &fields.named {
                     let Some(ident) = &f.ident else { continue };
                     let fname = ident.to_string();
-                    match long_flag(&f.attrs, &fname) {
+                    match long_flag(&f.attrs) {
                         Some(Some(name)) => self.emit(
                             name,
                             self.scope.qualify(&format!("{}::{}", st, fname)),

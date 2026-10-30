@@ -19,21 +19,9 @@ from pathlib import Path
 
 from ..adapters import AdapterResult
 from ..config import PathMatcher
-from ..records import Record
+from ..records import EXT_LANG, Record
 
 EXTRACTOR = "protocol-ids"
-
-_EXT_LANG = {
-    ".go": "go",
-    ".rs": "rust",
-    ".py": "python",
-    ".ts": "ts",
-    ".tsx": "ts",
-    ".js": "ts",
-    ".jsx": "ts",
-    ".mjs": "ts",
-    ".cjs": "ts",
-}
 
 # Quoted literals on a single line. Protocol ids never contain quotes, so
 # escape handling is not needed.
@@ -148,7 +136,7 @@ def extract(root) -> AdapterResult:
     for f in sorted(root.rglob("*")):
         if not f.is_file():
             continue
-        lang = _EXT_LANG.get(f.suffix.lower())
+        lang = EXT_LANG.get(f.suffix.lower())
         if lang is None:
             continue
         rel = f.relative_to(root).as_posix()

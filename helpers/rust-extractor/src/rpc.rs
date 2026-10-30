@@ -219,12 +219,6 @@ impl<'ast> Visit<'ast> for RpcVisit<'ast> {
     }
 }
 
-/// Render a full path (`a::b::X`); kept for parity with other modules.
-#[allow(dead_code)]
-fn full_path(p: &syn::Path) -> String {
-    path_string(p)
-}
-
 #[cfg(test)]
 mod tests {
     use crate::testutil::{ids, run};

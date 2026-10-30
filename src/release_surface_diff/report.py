@@ -7,6 +7,10 @@ guard classes, and a coverage ledger with one row per new entry point
 plus adapter gap notes. Ordering is deterministic everywhere.
 """
 
+from pathlib import Path
+
+from ._util import write_text
+from .adapters import LOW_CONFIDENCE_ATTR
 from .rank import RankedHunk, iter_delta_records, rank_delta, surface_weight
 
 ENTRY_KINDS = ("route", "rpc", "protocol_id")
@@ -50,6 +54,7 @@ def shape_tags(record: dict, hunks: list[RankedHunk]) -> list[str]:
         r for r in hunks
         if (sym and r.hunk.symbol == sym) or r.hunk.file == path
     ]
+    arms = sum(1 for x in nearby if x.hunk.hunk_class == "dispatch")
     for r in nearby:
         ev = (r.hunk.evidence or "").lower()
         if r.hunk.hunk_class == "bounds" and any(
@@ -58,7 +63,6 @@ def shape_tags(record: dict, hunks: list[RankedHunk]) -> list[str]:
             if "length-field" not in tags:
                 tags.append("length-field")
         if r.hunk.hunk_class == "dispatch":
-            arms = sum(1 for x in nearby if x.hunk.hunk_class == "dispatch")
             tag = f"dispatch={arms}/{arms + 1} upstream enum"
             if tag not in tags:
                 tags.append(tag)
@@ -114,7 +118,7 @@ def build_report(
             else:
                 weight = surface_weight(_rec_kind(item))
                 low = " (low confidence)" if (item.get("attrs") or {}).get(
-                    "low_confidence"
+                    LOW_CONFIDENCE_ATTR
                 ) else ""
                 lines.append(
                     f"- `{item.get('id','?')}`"
@@ -175,18 +179,5 @@ def build_report(
     return "\n".join(lines)
 
 
-def write_report(text: str, path) -> "object":
-    from pathlib import Path
-
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(text)
-    return p
-
-
-def other_delta_summary(surface: dict) -> list[dict]:
-    """Non-entry delta records (flags, config, exports, outbound), sorted."""
-    return [
-        r for r in iter_delta_records(surface)
-        if _rec_kind(r) not in ENTRY_KINDS
-    ]
+def write_report(text: str, path) -> Path:
+    return write_text(path, text)

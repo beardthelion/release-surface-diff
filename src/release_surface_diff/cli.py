@@ -264,8 +264,8 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     except config.ConfigError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_ERROR
-    if not langs:
-        print("error: --lang needs a language (go, rust, python, ts)", file=sys.stderr)
+    if len(langs) != 1:
+        print("error: extract takes exactly one --lang", file=sys.stderr)
         return EXIT_ERROR
     matcher = _matcher(args.include, args.exclude)
     result = extract.extract_lang(root, langs[0], matcher, _tools(args))
@@ -292,8 +292,6 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_extract(args)
         if args.command == "watch":
             return _cmd_watch(args)
-        print(f"{args.command} is not implemented yet", file=sys.stderr)
-        return EXIT_ERROR
     except (gitops.GitError, config.ConfigError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_ERROR

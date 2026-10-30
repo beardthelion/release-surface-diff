@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ._util import canonical_json, utc_now, write_text
 from .config import PathMatcher
 from .records import SymbolSpan
 
@@ -119,8 +120,6 @@ class GuardHunk:
     direction: str
     symbol: "str | None"
     evidence: str
-    context: str = ""
-    changed: list[tuple[str, str]] = field(default_factory=list)
 
     @property
     def weight(self) -> int:
@@ -345,18 +344,12 @@ def classify_diff(
                     direction=direction,
                     symbol=symbol,
                     evidence=(sign + content)[:EVIDENCE_MAX],
-                    context=hunk.context,
-                    changed=class_lines,
                 )
             )
     return out
 
 
 # ---- guards.json emission (R14, R16) ----
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def guards_json(
@@ -372,19 +365,16 @@ def guards_json(
         "repo": repo,
         "from": from_ref,
         "to": to_ref,
-        "generated_at": generated_at if generated_at is not None else _utc_now(),
+        "generated_at": generated_at if generated_at is not None else utc_now(),
         "hunks": [h.to_dict() for h in hunks],
     }
 
 
 def guards_json_text(result: dict) -> str:
     """Canonical serialization: sorted keys, stable across runs (R16)."""
-    return json.dumps(result, indent=2, sort_keys=True) + "\n"
+    return canonical_json(result)
 
 
 def write_guards_json(result: dict, path: "str | Path") -> Path:
     """Write guards.json, creating the output directory if needed."""
-    out = Path(path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(guards_json_text(result), encoding="utf-8")
-    return out
+    return write_text(path, guards_json_text(result))

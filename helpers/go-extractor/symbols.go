@@ -3,6 +3,7 @@ package main
 import (
 	"go/ast"
 	"go/token"
+	pathpkg "path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ func (p *pkgCtx) indexFile(f *ast.File) {
 		if err != nil {
 			continue
 		}
-		alias := pathBase(path)
+		alias := pathpkg.Base(path)
 		if spec.Name != nil {
 			alias = spec.Name.Name
 		}

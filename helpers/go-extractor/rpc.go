@@ -2,6 +2,7 @@ package main
 
 import (
 	"go/ast"
+	pathpkg "path"
 	"regexp"
 )
 
@@ -113,7 +114,7 @@ func isRPCReceiver(p *pkgCtx, f *ast.File, e ast.Expr) bool {
 		return false
 	}
 	path, imported := p.importPath(f, id)
-	return imported && pathBase(path) == "rpc"
+	return imported && pathpkg.Base(path) == "rpc"
 }
 
 // serviceNameOf extracts ServiceName from a ServiceDesc literal.
