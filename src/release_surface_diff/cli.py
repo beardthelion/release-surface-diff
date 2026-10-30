@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import config, gitops
+from . import config, extract, gitops
 from .records import record_sort_key
 
 EXIT_NO_DELTA = 0
@@ -62,6 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
              "vendored, generated, docs)",
     )
     run.add_argument("--out", default="out", help="output directory (default: out/)")
+    _tool_flags(run)
 
     extract = sub.add_parser(
         "extract",
@@ -78,6 +79,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--exclude", action="append", default=None, metavar="GLOB",
         help="repo-relative path globs to drop (repeatable)",
     )
+    _tool_flags(extract)
 
     watch = sub.add_parser(
         "watch",
@@ -89,13 +91,34 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _extract_stub(root: Path, lang: str, matcher: config.PathMatcher) -> list:
-    """Placeholder for the extractor dispatch that lands in extract.py (U2).
+def _tool_flags(sub) -> None:
+    """Explicit-path overrides for the extractor tools (discovery: flag >
+    env var > PATH, KTD3)."""
+    sub.add_argument("--egress-plane", metavar="PATH",
+                     help="path to the egress-plane binary")
+    sub.add_argument("--acl-guard-audit", metavar="PATH",
+                     help="path to the acl-guard-audit binary")
+    sub.add_argument("--go-extractor", metavar="PATH",
+                     help="path to the go-extractor helper binary")
+    sub.add_argument("--rust-extractor", metavar="PATH",
+                     help="path to the rust-extractor helper binary")
 
-    Returns an empty inventory for now; callers surface the gap as a warning
-    per R17 rather than a silent skip.
-    """
-    return []
+
+def _tools(args) -> extract.ToolPaths:
+    return extract.ToolPaths(
+        egress_plane=getattr(args, "egress_plane", None),
+        acl_guard_audit=getattr(args, "acl_guard_audit", None),
+        go_extractor=getattr(args, "go_extractor", None),
+        rust_extractor=getattr(args, "rust_extractor", None),
+    )
+
+
+def _report_result(tag: str, result) -> None:
+    """Warnings and gap notes go to stderr; stdout stays machine output."""
+    for w in result.warnings:
+        print(f"warning [{tag}]: {w}", file=sys.stderr)
+    for note in result.gap_notes:
+        print(f"note [{tag}]: {note}", file=sys.stderr)
 
 
 def _matcher(args) -> config.PathMatcher:
@@ -130,20 +153,16 @@ def _cmd_run(args: argparse.Namespace) -> int:
         with gitops.worktrees(repo.path, [from_tag, to_tag]) as wts:
             diff = gitops.git_diff(repo.path, from_tag, to_tag)
             langs = langs or config.detect_languages(wts[to_tag])
-            records_from = sum(
-                (_extract_stub(wts[from_tag], lang, matcher) for lang in langs), []
+            result_from = extract.extract_tree(
+                wts[from_tag], langs, matcher, _tools(args)
             )
-            records_to = sum(
-                (_extract_stub(wts[to_tag], lang, matcher) for lang in langs), []
+            result_to = extract.extract_tree(
+                wts[to_tag], langs, matcher, _tools(args)
             )
+    _report_result(from_tag, result_from)
+    _report_result(to_tag, result_to)
     changed_files = diff.count("diff --git ")
     print(f"{from_tag}..{to_tag}: {changed_files} file(s) changed")
-    if not records_from and not records_to:
-        print(
-            "note: no extractors wired yet; run covered tag resolution, "
-            "worktrees, and diff capture only",
-            file=sys.stderr,
-        )
     # Until the record diff and guard classifier land (U3, U6), the captured
     # diff is the delta signal: empty means nothing changed between the tags.
     return EXIT_DELTA if diff.strip() else EXIT_NO_DELTA
@@ -163,14 +182,12 @@ def _cmd_extract(args: argparse.Namespace) -> int:
         print("error: --lang needs a language (go, rust, python, ts)", file=sys.stderr)
         return EXIT_ERROR
     matcher = _matcher(args)
-    records = _extract_stub(root, langs[0], matcher)
-    for rec in sorted(records, key=record_sort_key):
+    result = extract.extract_lang(root, langs[0], matcher, _tools(args))
+    for rec in sorted(result.records, key=record_sort_key):
         print(rec.to_json())
-    if not records:
-        print(
-            f"note: no extractor wired for '{langs[0]}' yet; empty inventory",
-            file=sys.stderr,
-        )
+    _report_result(langs[0], result)
+    if not result.records:
+        print(f"note: empty inventory for '{langs[0]}'", file=sys.stderr)
     return EXIT_NO_DELTA
 
 
