@@ -478,8 +478,11 @@ class TestHelpers:
         assert not res.complete
         assert res.records[0].attrs.get("low_confidence") is True
 
-    def test_missing_helper_degrades(self, root, monkeypatch):
+    def test_missing_helper_degrades(self, root, monkeypatch, tmp_path):
         monkeypatch.delenv("RSD_RUST_EXTRACTOR", raising=False)
+        # Point at a checkout with no helpers/ source so the helper is
+        # genuinely absent regardless of which units have landed.
+        monkeypatch.setattr(helpers, "_repo_root", lambda: tmp_path)
         res = helpers.run_helper("rust", root)
         assert res.records == []
         assert not res.complete
@@ -626,8 +629,11 @@ class TestExtractTree:
         assert "GET /v1/users" in ids
         assert "requests:env:API_URL" in ids
 
-    def test_absent_tool_names_a_gap(self, stub_path, root):
-        # nothing on PATH for go: egress, acl, and the helper all degrade
+    def test_absent_tool_names_a_gap(self, stub_path, root, tmp_path, monkeypatch):
+        # nothing on PATH for go: egress, acl, and the helper all degrade.
+        # _repo_root is isolated so an absent helper stays absent even when
+        # helper sources exist in the real checkout.
+        monkeypatch.setattr(helpers, "_repo_root", lambda: tmp_path)
         res = extract.extract_tree(root, ("go",))
         assert res.records == []
         assert not res.complete

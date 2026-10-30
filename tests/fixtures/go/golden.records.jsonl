@@ -1,0 +1,38 @@
+{"kind":"cli_flag","id":"--config","file":"surface/cli.go","line":10,"symbol":"buildCmd","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"registrar":"cobra"}}
+{"kind":"cli_flag","id":"--port","file":"surface/cli.go","line":11,"symbol":"buildCmd","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"registrar":"cobra"}}
+{"kind":"cli_flag","id":"--timeout","file":"surface/main.go","line":17,"symbol":"main","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"registrar":"flag"}}
+{"kind":"cli_flag","id":"--verbose","file":"surface/cli.go","line":14,"symbol":"buildCmd","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"registrar":"urfave-cli"}}
+{"kind":"config_key","id":"debug","file":"surface/config.go","line":7,"symbol":"Config","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"root":"Config","tag":"toml"}}
+{"kind":"config_key","id":"server","file":"surface/config.go","line":6,"symbol":"Config","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"root":"Config","tag":"toml"}}
+{"kind":"config_key","id":"server.host","file":"surface/config.go","line":12,"symbol":"serverSection","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"root":"Config","tag":"toml"}}
+{"kind":"config_key","id":"server.port","file":"surface/config.go","line":13,"symbol":"serverSection","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"root":"Config","tag":"toml"}}
+{"kind":"config_key","id":"server.tls","file":"surface/config.go","line":14,"symbol":"serverSection","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"root":"Config","tag":""}}
+{"kind":"config_key","id":"server.tls.enabled","file":"surface/config.go","line":18,"symbol":"tlsSection","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"root":"Config","tag":"toml"}}
+{"kind":"export","id":"example.com/surface.Config","file":"surface/config.go","line":5,"symbol":"Config","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"decl":"type"}}
+{"kind":"export","id":"example.com/surface.ExportedHelper","file":"surface/main.go","line":14,"symbol":"ExportedHelper","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"decl":"func"}}
+{"kind":"export","id":"example.com/surface/lib.Client","file":"surface/lib/lib.go","line":7,"symbol":"Client","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"decl":"type"}}
+{"kind":"export","id":"example.com/surface/lib.Client.Connect","file":"surface/lib/lib.go","line":11,"symbol":"Client.Connect","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"decl":"method"}}
+{"kind":"export","id":"example.com/surface/lib.DefaultTimeout","file":"surface/lib/lib.go","line":5,"symbol":"DefaultTimeout","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"decl":"var"}}
+{"kind":"export","id":"example.com/surface/lib.NewClient","file":"surface/lib/lib.go","line":9,"symbol":"NewClient","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"decl":"func"}}
+{"kind":"export","id":"example.com/surface/lib.Version","file":"surface/lib/lib.go","line":3,"symbol":"Version","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"decl":"const"}}
+{"kind":"route","id":"ANY /healthz","file":"surface/main.go","line":20,"symbol":"hello","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"framework":"net/http","method":"ANY","template":"/healthz"}}
+{"kind":"route","id":"ANY /hello","file":"basic/main.go","line":8,"symbol":"hello","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"framework":"net/http","method":"ANY","template":"/hello"}}
+{"kind":"route","id":"ANY /hello","file":"surface/main.go","line":19,"symbol":"hello","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"framework":"net/http","method":"ANY","template":"/hello"}}
+{"kind":"route","id":"ANY /hidden","file":"surface/internal/hidden/hidden.go","line":8,"symbol":"Hidden","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"framework":"net/http","method":"ANY","template":"/hidden"}}
+{"kind":"route","id":"ANY /static","file":"surface/mux.go","line":16,"symbol":"gorillaRoutes","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"auth_hint":"http.StripPrefix,http.FileServer,http.Dir","framework":"mux","method":"ANY","template":"/static"}}
+{"kind":"route","id":"DELETE /users/{id}","file":"surface/server.go","line":24,"symbol":"deleteUser","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"auth_hint":"authMw,adminMw","framework":"chi","method":"DELETE","template":"/users/{id}"}}
+{"kind":"route","id":"GET /admin/stats","file":"surface/server.go","line":27,"symbol":"adminStats","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"auth_hint":"authMw,adminMw","framework":"chi","method":"GET","template":"/admin/stats"}}
+{"kind":"route","id":"GET /api/ping","file":"surface/api.go","line":16,"symbol":"ping","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"auth_hint":"jwtMw,auditMw","framework":"gin","method":"GET","template":"/api/ping"}}
+{"kind":"route","id":"GET /healthz","file":"surface/api.go","line":17,"symbol":"ping","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"framework":"gin","method":"GET","template":"/healthz"}}
+{"kind":"route","id":"GET /items/{id}","file":"surface/mux.go","line":14,"symbol":"getItem","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"framework":"mux","method":"GET","template":"/items/{id}"}}
+{"kind":"route","id":"GET /status","file":"surface/echo.go","line":9,"symbol":"echoHandler","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"framework":"echo","method":"GET","template":"/status"}}
+{"kind":"route","id":"GET /users/{id}","file":"surface/server.go","line":22,"symbol":"getUser","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"auth_hint":"authMw","framework":"chi","method":"GET","template":"/users/{id}"}}
+{"kind":"route","id":"GET /wrapped","file":"surface/main.go","line":21,"symbol":"hello","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"auth_hint":"auth,http.HandlerFunc","framework":"net/http","method":"GET","template":"/wrapped"}}
+{"kind":"route","id":"POST /api/login","file":"surface/api.go","line":15,"symbol":"login","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"auth_hint":"jwtMw","framework":"gin","method":"POST","template":"/api/login"}}
+{"kind":"route","id":"POST /users","file":"surface/server.go","line":23,"symbol":"createUser","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"auth_hint":"authMw","framework":"chi","method":"POST","template":"/users"}}
+{"kind":"route","id":"POST /v2/items","file":"surface/echo.go","line":11,"symbol":"echoHandler","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"framework":"echo","method":"POST","template":"/v2/items"}}
+{"kind":"route","id":"PUT /items/{id}","file":"surface/mux.go","line":15,"symbol":"putItem","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"framework":"mux","method":"PUT","template":"/items/{id}"}}
+{"kind":"rpc","id":"User","file":"surface/rpcsvc.go","line":18,"symbol":"wireRPC","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"source":"register_server"}}
+{"kind":"rpc","id":"admin","file":"surface/rpcsvc.go","line":21,"symbol":"wireRPC","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"source":"api_namespace"}}
+{"kind":"rpc","id":"eth","file":"surface/rpcsvc.go","line":20,"symbol":"wireRPC","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"source":"api_namespace"}}
+{"kind":"rpc","id":"user.User","file":"surface/rpcsvc.go","line":14,"symbol":"wireRPC","lang":"go","extractor":"go-extractor@0.1.0","attrs":{"source":"service_desc"}}
