@@ -366,11 +366,11 @@ def test_log_l_resolves_introducing_commit(synthetic_repo) -> None:
     found = {h.file: s for h, s in zip(
         hunks, seeds.build_seeds(repo, str(repo), hunks, "v1.0.0", "v1.1.0")
     )}
-    # removed guards attribute to the commit that introduced the lines on
-    # the from side (c2), not the to-tag commit (c4)
-    assert found["decode.py"]["sha"] == shas["c2"]
-    assert found["decode.py"]["parent"] == shas["c1"]
-    assert found["flags.py"]["sha"] == shas["c2"]
+    # removed guards attribute to the commit that removed the lines within
+    # the tag range: c4, which is also the to-tag commit here (R15)
+    assert found["decode.py"]["sha"] == shas["c4"]
+    assert found["decode.py"]["parent"] == shas["c2b"]
+    assert found["flags.py"]["sha"] == shas["c4"]
     # added lines attribute on the to side; c4 is the tag commit itself
     assert found["routes.py"]["sha"] == shas["c4"]
     assert found["routes.py"]["parent"] == shas["c2b"]
@@ -405,3 +405,40 @@ def test_seeds_jsonl_roundtrip(synthetic_repo, tmp_path) -> None:
     out = seeds.write_seeds_jsonl(lines, tmp_path / "out" / "seeds.jsonl")
     parsed = [json.loads(l) for l in out.read_text().splitlines() if l.strip()]
     assert parsed == lines
+
+
+def test_removed_hunk_seed_attributes_to_remover(tmp_path) -> None:
+    """Three commits: c1 adds a guard, c2 unrelated, c3 removes it. The seed
+    sha for the removed hunk is the removing commit c3, parent is c2."""
+    import subprocess
+    from release_surface_diff import seeds as seeds_mod
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    def git(*a):
+        return subprocess.run(["git", "-C", str(repo), *a],
+                              capture_output=True, text=True, check=True).stdout
+    git("init", "-q")
+    git("config", "user.email", "t@t")
+    git("config", "user.name", "t")
+    (repo / "app.py").write_text(
+        "def h():\n    check_perm(u)\n    return 1\n")
+    git("add", "app.py"); git("commit", "-qm", "c1")
+    c1 = git("rev-parse", "HEAD").strip()
+    git("tag", "v1.0.0")
+    (repo / "other.txt").write_text("x")
+    git("add", "other.txt"); git("commit", "-qm", "c2")
+    c2 = git("rev-parse", "HEAD").strip()
+    (repo / "app.py").write_text("def h():\n    return 1\n")
+    git("add", "app.py"); git("commit", "-qm", "c3")
+    c3 = git("rev-parse", "HEAD").strip()
+    git("tag", "v1.1.0")
+
+    hunk = guards.GuardHunk(
+        file="app.py", old_file="app.py",
+        old_start=2, old_count=1, new_start=1, new_count=1,
+        hunk_class="auth", direction="removed", symbol=None,
+        evidence="-    check_perm(u)")
+    out = seeds_mod.build_seeds(repo, str(repo), [hunk], "v1.0.0", "v1.1.0")
+    assert out[0]["sha"] == c3
+    assert out[0]["parent"] == c2

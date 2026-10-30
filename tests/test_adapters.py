@@ -90,7 +90,9 @@ def make_helper(
 
 @pytest.fixture
 def stub_path(tmp_path, monkeypatch):
-    """Prepend an empty dir to PATH and clear tool env overrides."""
+    """PATH = stub dir + dirs holding git/python/bash only, and clear tool
+    env overrides, so a system-installed egress-plane or acl-guard-audit can
+    never leak into these tests."""
     bindir = tmp_path / "bin"
     bindir.mkdir()
     for var in (
@@ -100,7 +102,14 @@ def stub_path(tmp_path, monkeypatch):
         "RSD_RUST_EXTRACTOR",
     ):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
+    keep = [str(bindir)]
+    for tool in ("git", "python3", "python", "bash", "sh"):
+        found = shutil.which(tool)
+        if found:
+            d = os.path.dirname(found)
+            if d not in keep:
+                keep.append(d)
+    monkeypatch.setenv("PATH", os.pathsep.join(keep))
     return bindir
 
 

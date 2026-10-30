@@ -43,11 +43,15 @@ def _hunk_lookup(hunk: GuardHunk, from_ref: str, to_ref: str):
     to tag, so history must be traced where they still lived (KTD10). Added
     and modified hunks resolve on the to side, where the lines were written.
     """
+    # Bound the walk to from..to so the newest touching commit is the one
+    # that produced the diff hunk: for a removed line that is the removing
+    # commit, not the commit that originally added the line (spec R15).
+    rev = f"{from_ref}..{to_ref}"
     if hunk.direction == "removed":
         end = hunk.old_start + hunk.old_count - 1
-        return from_ref, hunk.old_file, hunk.old_start, end
+        return rev, hunk.old_file, hunk.old_start, end
     end = hunk.new_start + hunk.new_count - 1
-    return to_ref, hunk.file, hunk.new_start, end
+    return rev, hunk.file, hunk.new_start, end
 
 
 def _introducing_commit(repo, ref: str, path: str, start: int, end: int,
