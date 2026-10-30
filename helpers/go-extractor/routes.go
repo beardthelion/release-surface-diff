@@ -1325,6 +1325,11 @@ func (w *routeWalker) walkUnknownSubrouter(e ast.Expr, scope *routeScope) {
 	if lit == nil || lit.Body == nil {
 		return
 	}
+	if af, name := w.swapToLiteralFile(lit); af != nil {
+		of, ofile := w.f, w.file
+		w.f, w.file = af, name
+		defer func() { w.f, w.file = of, ofile }()
+	}
 	child := scope.child()
 	child.known = false
 	if len(lit.Type.Params.List) > 0 &&
@@ -1392,10 +1397,40 @@ func (w *routeWalker) feedRouterArg(e ast.Expr, vals []routerVal) {
 	m[name] = append(m[name], paramFeed{caller: w.fd, vals: vals})
 }
 
+// astFileByName returns the package ast.File whose record path matches
+// name, or nil.
+func (p *pkgCtx) astFileByName(name string) *ast.File {
+	for _, f := range p.files {
+		if p.fileOf(f) == name {
+			return f
+		}
+	}
+	return nil
+}
+
+// swapToLiteralFile points the walker at the file that actually contains
+// lit when it differs from the walking file (factory literals live in
+// their own file; the mount site file would otherwise be misreported).
+func (w *routeWalker) swapToLiteralFile(lit *ast.FuncLit) (astFile *ast.File, name string) {
+	name = w.p.relFile(w.p.position(lit.Pos()).Filename)
+	if name == w.file {
+		return nil, ""
+	}
+	if af := w.p.astFileByName(name); af != nil {
+		return af, name
+	}
+	return nil, ""
+}
+
 // walkSubrouter descends into a Route/Group/Mount function literal with
 // its first parameter bound to the joined prefix.
 func (w *routeWalker) walkSubrouter(template string, mws []string,
 	lit *ast.FuncLit, scope *routeScope) {
+	if af, name := w.swapToLiteralFile(lit); af != nil {
+		of, ofile := w.f, w.file
+		w.f, w.file = af, name
+		defer func() { w.f, w.file = of, ofile }()
+	}
 	child := scope.child()
 	if len(lit.Type.Params.List) > 0 &&
 		len(lit.Type.Params.List[0].Names) > 0 {

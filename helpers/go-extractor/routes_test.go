@@ -433,7 +433,7 @@ func TestNormRoutePath(t *testing.T) {
 
 func TestNestedFactoryMount(t *testing.T) {
 	ctx := extractOne(t, map[string]string{
-		"a.go": `package demo
+		"factory.go": `package demo
 
 import (
 	"net/http"
@@ -453,6 +453,10 @@ func inner(mw func(http.Handler) http.Handler) func(r chi.Router) {
 func outer(mw func(http.Handler) http.Handler) func(r chi.Router) {
 	return inner(mw)
 }
+`,
+		"a.go": `package demo
+
+import "github.com/go-chi/chi/v5"
 
 func top(r chi.Router) {
 	r.Route("/api/v2", func(r chi.Router) {
@@ -462,7 +466,8 @@ func top(r chi.Router) {
 }
 `,
 	})
-	ids := recordIDs(extractRoutes(ctx))
+	recs := extractRoutes(ctx)
+	ids := recordIDs(recs)
 	for _, want := range []string{
 		"route|GET /api/v2/aibridge/sessions",
 		"route|GET /api/v2/aibridge/models",
@@ -477,5 +482,21 @@ func top(r chi.Router) {
 		if ids[id] {
 			t.Errorf("prefixless record %s leaked", id)
 		}
+	}
+	var sawSessions bool
+	for _, r := range recs {
+		if r.ID != "GET /api/v2/aibridge/sessions" {
+			continue
+		}
+		sawSessions = true
+		if r.File != "factory.go" {
+			t.Errorf("file = %s, want factory.go", r.File)
+		}
+		if r.Line != 13 {
+			t.Errorf("line = %d, want 13 (the r.Get call in factory.go)", r.Line)
+		}
+	}
+	if !sawSessions {
+		t.Error("GET /api/v2/aibridge/sessions record not emitted")
 	}
 }
