@@ -1,0 +1,32 @@
+{
+  "from": "v1.0.0",
+  "generated_at": "2026-10-30T03:57:23Z",
+  "hunks": [
+    {
+      "class": "bounds",
+      "direction": "removed",
+      "evidence": "-    if len(data) > MAX_BODY:",
+      "file": "app.py",
+      "new_end": 36,
+      "new_start": 31,
+      "old_end": 33,
+      "old_start": 26,
+      "symbol": "decode_payload",
+      "weight": 3
+    },
+    {
+      "class": "auth",
+      "direction": "removed",
+      "evidence": "-    parser.add_argument(\"--skip-verify\", action=\"store_true\")",
+      "file": "cli.py",
+      "new_end": 15,
+      "new_start": 1,
+      "old_end": 20,
+      "old_start": 1,
+      "symbol": "parse_args",
+      "weight": 3
+    }
+  ],
+  "repo": "synthetic",
+  "to": "v1.1.0"
+}

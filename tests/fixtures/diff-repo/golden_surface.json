@@ -1,0 +1,50 @@
+{
+  "added": [
+    {
+      "attrs": {
+        "low_confidence": true
+      },
+      "extractor": "py-ts-routes",
+      "file": "app.py",
+      "id": "POST /admin/rotate-keys",
+      "kind": "route",
+      "lang": "python",
+      "line": 10,
+      "symbol": "rotate_keys"
+    }
+  ],
+  "changed": [],
+  "from": "v1.0.0",
+  "generated_at": "2026-10-30T03:57:23Z",
+  "removed": [],
+  "renamed": [
+    {
+      "after": {
+        "attrs": {
+          "low_confidence": true
+        },
+        "extractor": "py-ts-routes",
+        "file": "app.py",
+        "id": "GET /members/{id}",
+        "kind": "route",
+        "lang": "python",
+        "line": 20,
+        "symbol": "user_detail"
+      },
+      "before": {
+        "attrs": {
+          "low_confidence": true
+        },
+        "extractor": "py-ts-routes",
+        "file": "app.py",
+        "id": "GET /users/{id}",
+        "kind": "route",
+        "lang": "python",
+        "line": 15,
+        "symbol": "user_detail"
+      }
+    }
+  ],
+  "repo": "synthetic",
+  "to": "v1.1.0"
+}

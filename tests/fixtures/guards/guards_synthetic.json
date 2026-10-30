@@ -1,0 +1,44 @@
+{
+  "from": "v1.0.0",
+  "generated_at": "2026-10-29T00:00:00Z",
+  "hunks": [
+    {
+      "class": "bounds",
+      "direction": "removed",
+      "evidence": "-    if len(buf) > MAX_FOO:",
+      "file": "decode.py",
+      "new_end": 2,
+      "new_start": 1,
+      "old_end": 4,
+      "old_start": 1,
+      "symbol": "decode_foo",
+      "weight": 3
+    },
+    {
+      "class": "allowlist",
+      "direction": "removed",
+      "evidence": "-    parser.add_argument(\"--allowlist-file\", help=\"comma-separated issuers\")",
+      "file": "flags.py",
+      "new_end": 2,
+      "new_start": 1,
+      "old_end": 3,
+      "old_start": 1,
+      "symbol": "add_flags",
+      "weight": 3
+    },
+    {
+      "class": "auth",
+      "direction": "added",
+      "evidence": "+    app.get(\"/admin\", require_admin(admin_overview))",
+      "file": "routes.py",
+      "new_end": 4,
+      "new_start": 1,
+      "old_end": 3,
+      "old_start": 1,
+      "symbol": "register_routes",
+      "weight": 2
+    }
+  ],
+  "repo": "target",
+  "to": "v1.1.0"
+}

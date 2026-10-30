@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "release-surface-diff"
+dynamic = ["version"]
+description = "Diff the externally reachable surface of a repo between two release tags"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+release-surface-diff = "release_surface_diff.cli:main"
+
+[tool.hatch.version]
+path = "src/release_surface_diff/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/release_surface_diff"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["bin", "docs", "dist", "build", "out", "helpers"]
