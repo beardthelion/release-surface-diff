@@ -76,6 +76,27 @@ fn extract_file(root: &Path, path: &Path, out: &mut Extraction) {
             .push(format!("{}: could not read file", rel));
         return;
     };
+    // syn's parser recurses per nesting level, so a pathological file
+    // (generated corpus fixtures nest 100k+) overflows any stack before
+    // visitors run. Cheap byte scan bounds the parse instead.
+    const MAX_NESTING: usize = 4096;
+    let mut depth = 0usize;
+    for b in src.bytes() {
+        match b {
+            b'(' | b'[' | b'{' => {
+                depth += 1;
+                if depth > MAX_NESTING {
+                    out.warnings.push(format!(
+                        "{}: skipped (nesting depth > {})",
+                        rel, MAX_NESTING
+                    ));
+                    return;
+                }
+            }
+            b')' | b']' | b'}' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
     let file = match syn::parse_file(&src) {
         Ok(f) => f,
         Err(e) => {
@@ -104,8 +125,33 @@ fn write_sidecar(path: Option<&PathBuf>, lines: impl Iterator<Item = String>) ->
     fs::write(path, buf).map_err(|e| format!("could not write {}: {}", path.display(), e))
 }
 
+const WORK_STACK_BYTES: usize = 256 * 1024 * 1024;
+
 fn main() -> ExitCode {
+    // Extraction runs on a spawned thread with a large stack: deeply nested
+    // real-world files overflow the default 8 MiB stack and abort the
+    // process, and the thread boundary also turns ordinary panics into a
+    // clean exit 2 instead of a crash.
     let args: Vec<String> = env::args().skip(1).collect();
+    match std::thread::Builder::new()
+        .stack_size(WORK_STACK_BYTES)
+        .spawn(move || run(args))
+    {
+        Ok(h) => match h.join() {
+            Ok(code) => code,
+            Err(_) => {
+                eprintln!("rust-extractor: worker panicked");
+                ExitCode::from(2)
+            }
+        },
+        Err(e) => {
+            eprintln!("rust-extractor: could not spawn worker: {e}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn run(args: Vec<String>) -> ExitCode {
     let mut root: Option<PathBuf> = None;
     let mut symbols: Option<PathBuf> = None;
     let mut edges: Option<PathBuf> = None;

@@ -1049,7 +1049,11 @@ impl<'ast> Visit<'ast> for RouteVisit<'ast> {
                         if self.bindings.contains_key(&name) {
                             if let Some(inits) = self.bindings.get(&name) {
                                 if let Some(init) = inits.first() {
-                                    if is_router_new_chain(init, &self.bindings) {
+                                    if is_router_new_chain(
+                                        init,
+                                        &self.bindings,
+                                        &mut HashSet::new(),
+                                    ) {
                                         let ctx = AxumCtx {
                                             bindings: &self.bindings,
                                         };
@@ -1078,7 +1082,11 @@ impl<'ast> Visit<'ast> for RouteVisit<'ast> {
 }
 
 /// Is `expr` (or the binding it names) a `Router::new()` chain?
-fn is_router_new_chain(expr: &Expr, bindings: &HashMap<String, Vec<&Expr>>) -> bool {
+fn is_router_new_chain(
+    expr: &Expr,
+    bindings: &HashMap<String, Vec<&Expr>>,
+    seen: &mut HashSet<String>,
+) -> bool {
     let (root, _calls) = method_chain(expr);
     if is_router_new(root) {
         return true;
@@ -1086,9 +1094,14 @@ fn is_router_new_chain(expr: &Expr, bindings: &HashMap<String, Vec<&Expr>>) -> b
     if let Some(p) = expr_path(root) {
         if p.segments.len() == 1 {
             if let Some(name) = path_tail(p) {
+                // `let cat = cat.unwrap()` self-referential rebinds would
+                // recurse forever; stop at the first repeated name.
+                if !seen.insert(name.clone()) {
+                    return false;
+                }
                 if let Some(inits) = bindings.get(&name) {
                     if let Some(init) = inits.first() {
-                        return is_router_new_chain(init, bindings);
+                        return is_router_new_chain(init, bindings, seen);
                     }
                 }
             }
