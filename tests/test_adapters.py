@@ -594,8 +594,8 @@ class TestExtractTree:
         ids = {r.id for r in res.records}
         assert "requests:env:API_URL" in ids
         assert "GET /users/{id}" in ids
-        # in-repo route extractor absent -> its gap note names it (KD1)
-        assert any("route extractor" in n for n in res.gap_notes)
+        # in-repo route extractor (U5) runs alongside; no absence note (KD1)
+        assert not any("not present" in n for n in res.gap_notes)
 
     def test_records_outside_requested_langs_dropped(self, stub_path, root):
         make_tool(
@@ -668,4 +668,4 @@ class TestCliExtract:
         ids = {l["id"] for l in lines}
         assert "requests:env:API_URL" in ids
         assert "GET /users/{id}" in ids
-        assert "route extractor" in out.err or "note:" in out.err
+        assert "not present" not in out.err  # U5 landed: no absence note

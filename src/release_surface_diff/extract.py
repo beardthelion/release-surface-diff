@@ -86,6 +86,51 @@ def _py_ts_routes(root: Path) -> AdapterResult:
     return result
 
 
+def _protocol_ids(root: Path) -> AdapterResult:
+    """Bare-literal protocol-id pass (R10): the single producer for
+    req/resp protocol strings and gossip topic templates in every
+    language. Same tolerate-absence shape as _py_ts_routes."""
+    try:
+        from .extractors import protocol_ids
+    except ImportError:
+        return AdapterResult().degrade(
+            "protocol-ids", "in-repo protocol-id extractor not present"
+        )
+    try:
+        out = protocol_ids.extract(root)
+    except Exception as exc:
+        return AdapterResult().degrade("protocol-ids", f"extract failed: {exc}")
+    if isinstance(out, AdapterResult):
+        return out
+    result = AdapterResult()
+    if out:
+        result.records = list(out)
+    return result
+
+
+def _dedupe_py_ts_routes(result: AdapterResult) -> None:
+    """One entry point -> one record (KD1): acl-guard-audit and the in-repo
+    extractor describe the same routes, so a (kind, id) pair seen by both
+    keeps the in-repo record -- its attrs carry the auth_hint middleware
+    chain and it is guaranteed a symbol-table span (KTD7)."""
+    ours = {
+        (r.id, r.lang)
+        for r in result.records
+        if r.kind == "route" and r.extractor == "py-ts-routes"
+    }
+    if not ours:
+        return
+    result.records = [
+        r
+        for r in result.records
+        if not (
+            r.kind == "route"
+            and r.extractor != "py-ts-routes"
+            and (r.id, r.lang) in ours
+        )
+    ]
+
+
 def extract_tree(root, langs, matcher=None, tools=None) -> AdapterResult:
     """Run every adapter that covers `langs` against one tree.
 
@@ -116,6 +161,10 @@ def extract_tree(root, langs, matcher=None, tools=None) -> AdapterResult:
             else AdapterResult().degrade(aclguard.TOOL_NAME, warn)
         )
         result.merge(_py_ts_routes(root))
+        _dedupe_py_ts_routes(result)
+
+    if langs:
+        result.merge(_protocol_ids(root))
 
     for lang in langs:
         if lang in helpers.HELPERS:
@@ -123,8 +172,7 @@ def extract_tree(root, langs, matcher=None, tools=None) -> AdapterResult:
             result.merge(helpers.run_helper(lang, root, explicit=explicit))
 
     # Post-hoc filter (KTD11): black-box tools report what they saw; the
-    # matcher decides what is in scope. U5's route merge dedupes on
-    # (kind, id) when it lands.
+    # matcher decides what is in scope.
     result.records = [
         rec for rec in result.records if rec.lang in langs and matcher.matches(rec.file)
     ]
