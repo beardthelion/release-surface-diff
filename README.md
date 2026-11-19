@@ -109,3 +109,7 @@ Design notes: [docs/SPEC.md](docs/SPEC.md).
 - [cve-variant-sweep](https://github.com/beardthelion/cve-variant-sweep): consumes `seeds.jsonl`
 - [fuzzgen](https://github.com/beardthelion/fuzzgen): fuzz the new parser entry points this tool surfaces
 - [autocatalytic-harness](https://github.com/beardthelion/autocatalytic-harness): the audit harness the `SCOPE` and `Coverage` sections feed
+
+## License
+
+MIT. See [LICENSE](LICENSE).
